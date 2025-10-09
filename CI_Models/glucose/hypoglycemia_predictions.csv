@@ -1,2 +1,0 @@
-patient,start,end,predicted_label,predicted_probability,decision_threshold
-Patient_484_2,2001-12-19 06:15:00,2001-12-26 06:10:00,1,0.93042254,0.51

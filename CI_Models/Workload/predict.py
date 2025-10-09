@@ -93,7 +93,8 @@ class WorkloadPredictor:
         print(f"✓ Loaded model from {model_path}")
         
         # Load node data
-        data_path = os.path.join("data", f"{node_name}.csv")
+        data_path = os.path.join("CI_Models", "Workload", "data", f"{node_name}.csv")
+
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Data file not found: {data_path}")
         

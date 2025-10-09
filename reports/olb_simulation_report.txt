@@ -2,13 +2,13 @@
 === YAFS OLB SIMULATION PERFORMANCE REPORT ===
 
 KEY PERFORMANCE INDICATORS (KPIs):
-Overall Latency (L): 5.9223
+Overall Latency (L): 5.9336
   - Communication Latency: 0.2505
-  - Computing Latency: 5.6718
+  - Computing Latency: 5.6830
 Network Usage (Nusage): 5.0760 MB/s
-Execution Time (Te): 0.5922 ms
+Execution Time (Te): 0.5934 ms
 Energy Consumption (Etotal): 60.4725 W
-Cost of Execution (Ce): 2.0555
+Cost of Execution (Ce): 2.0566
 
 DETAILED ASSIGNMENT ANALYSIS:
 
@@ -25,31 +25,31 @@ Fog Node 4: 2 sensors assigned
     - Fog Node Position: (111.40398017227903, 717.6323289414235)
 
 Fog Node 3: 3 sensors assigned
-  Sensor 1: Total Latency = 0.8128
+  Sensor 1: Total Latency = 0.8146
     - Communication Latency: 0.0424
-    - Computing Latency: 0.7704
+    - Computing Latency: 0.7722
     - Sensor Position: (2676.538703114536, 173.8776652588323)
     - Fog Node Position: (1260.797544349595, 1246.1595631912905)
-  Sensor 2: Total Latency = 0.8080
+  Sensor 2: Total Latency = 0.8098
     - Communication Latency: 0.0376
-    - Computing Latency: 0.7704
+    - Computing Latency: 0.7722
     - Sensor Position: (79.60790905159088, 397.675301373297)
     - Fog Node Position: (1260.797544349595, 1246.1595631912905)
-  Sensor 9: Total Latency = 0.8032
+  Sensor 9: Total Latency = 0.8051
     - Communication Latency: 0.0329
-    - Computing Latency: 0.7704
+    - Computing Latency: 0.7722
     - Sensor Position: (1944.1061557397807, 1218.2620113339765)
     - Fog Node Position: (1260.797544349595, 1246.1595631912905)
 
 Fog Node 0: 2 sensors assigned
-  Sensor 3: Total Latency = 0.6431
+  Sensor 3: Total Latency = 0.6458
     - Communication Latency: 0.0135
-    - Computing Latency: 0.6296
+    - Computing Latency: 0.6323
     - Sensor Position: (2428.29137003348, 12.997519356122034)
     - Fog Node Position: (1498.2122545196262, 1052.2661901690717)
-  Sensor 8: Total Latency = 0.6381
+  Sensor 8: Total Latency = 0.6408
     - Communication Latency: 0.0085
-    - Computing Latency: 0.6296
+    - Computing Latency: 0.6323
     - Sensor Position: (1907.0533327932005, 729.6643579401684)
     - Fog Node Position: (1498.2122545196262, 1052.2661901690717)
 
@@ -68,9 +68,9 @@ Fog Node 1: 1 sensors assigned
     - Fog Node Position: (728.5543329477696, 237.13325269388258)
 
 Fog Node 2: 1 sensors assigned
-  Sensor 7: Total Latency = 0.2732
+  Sensor 7: Total Latency = 0.2735
     - Communication Latency: 0.0030
-    - Computing Latency: 0.2702
+    - Computing Latency: 0.2705
     - Sensor Position: (683.6948269546406, 578.7759272042143)
     - Fog Node Position: (193.44929710340617, 449.5890044418976)
 
