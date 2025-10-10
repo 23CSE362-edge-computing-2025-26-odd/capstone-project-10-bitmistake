@@ -36,7 +36,7 @@ class WorkloadPredictor:
             scaler_path = os.path.join(self.model_dir, 'scaler.pkl')
             with open(scaler_path, 'rb') as f:
                 self.scaler = pickle.load(f)
-            print(f"✓ Loaded scaler from {scaler_path}")
+            print(f"Loaded scaler from {scaler_path}")
             
             # Load training summary
             summary_path = os.path.join(self.model_dir, 'training_summary.pkl')
@@ -44,7 +44,7 @@ class WorkloadPredictor:
                 summary = pickle.load(f)
                 self.seq_length = summary['seq_length']
                 self.features = summary['features']
-            print(f"✓ Loaded parameters: seq_length={self.seq_length}, features={len(self.features)}")
+            print(f"Loaded parameters: seq_length={self.seq_length}, features={len(self.features)}")
             
         except FileNotFoundError as e:
             raise FileNotFoundError(f"Training artifacts not found. Run training script first. Error: {e}")
@@ -64,7 +64,7 @@ class WorkloadPredictor:
     def predict_future(self, node_name: str, future_steps: int = 200, 
                       plot: bool = True, save_plot: bool = True) -> Dict[str, Any]:
         """Predict future workload for a specific node"""
-        print(f"\n🔮 Predicting future workload for {node_name}...")
+        print(f"\nPredicting future workload for {node_name}...")
         
         # Load node model
         model_path = os.path.join(self.model_dir, f"{node_name}.h5")
@@ -77,7 +77,7 @@ class WorkloadPredictor:
         try:
             node_model = tf.keras.models.load_model(model_path)
         except Exception as e:
-            print(f"  ⚠️  Loading with compatibility mode...")
+            print(f"Loading with compatibility mode...")
             try:
                 # Try loading without compilation
                 node_model = tf.keras.models.load_model(model_path, compile=False)
@@ -90,7 +90,7 @@ class WorkloadPredictor:
             except Exception as e2:
                 raise RuntimeError(f"Failed to load model: {e2}")
         
-        print(f"✓ Loaded model from {model_path}")
+        print(f"Loaded model from {model_path}")
         
         # Load node data
         data_path = os.path.join("data", f"{node_name}.csv")
@@ -98,7 +98,7 @@ class WorkloadPredictor:
             raise FileNotFoundError(f"Data file not found: {data_path}")
         
         df_node = pd.read_csv(data_path)
-        print(f"✓ Loaded data: {len(df_node)} historical points")
+        print(f"Loaded data: {len(df_node)} historical points")
         
         # Validate features
         if not self.features:
@@ -123,7 +123,7 @@ class WorkloadPredictor:
             raise ValueError(f"Insufficient data. Need at least {self.seq_length} points.")
         
         # Generate predictions
-        print(f"🚀 Generating {future_steps} predictions...")
+        print(f"Generating {future_steps} predictions...")
         input_seq = X_node[-1].copy()
         predictions: List[float] = []
         
@@ -154,7 +154,7 @@ class WorkloadPredictor:
         predicted_max = float(predictions_rescaled.max())
         predicted_min = float(predictions_rescaled.min())
         
-        print(f"📊 Prediction Statistics:")
+        print(f"Prediction Statistics:")
         print(f"  Current avg (last 50): {current_avg:.2f}")
         print(f"  Predicted avg: {predicted_avg:.2f}")
         print(f"  Predicted range: {predicted_min:.2f} - {predicted_max:.2f}")
@@ -221,7 +221,7 @@ class WorkloadPredictor:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             plot_path = f'prediction_{node_name}_{timestamp}.png'
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-            print(f"📈 Plot saved as {plot_path}")
+            print(f"Plot saved as {plot_path}")
         
         plt.show()
     
@@ -260,7 +260,7 @@ def main() -> None:
                 try:
                     predictor.predict_future(node, args.steps, plot=False, save_plot=False)
                 except Exception as e:
-                    print(f"❌ Failed to predict {node}: {e}")
+                    print(f"Failed to predict {node}: {e}")
         else:
             # Interactive mode
             nodes = predictor.list_available_nodes()
@@ -281,7 +281,7 @@ def main() -> None:
             predictor.predict_future(node_choice, steps)
     
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
