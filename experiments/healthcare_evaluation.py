@@ -97,7 +97,7 @@ def run_healthcare_scenarios():
     os.makedirs("reports", exist_ok=True)
     os.makedirs("plots", exist_ok=True)
 
-    with open(f"data/healthcare_scenarios_{timestamp}.json", "w") as f:
+    with open(f"data/healthcare_scenarios_.json", "w") as f:
         json.dump(all_results, f, indent=2, default=str)
 
     # Generate report
@@ -107,14 +107,14 @@ def run_healthcare_scenarios():
     create_healthcare_visualizations(all_results, timestamp)
 
     print(
-        f"\\nHealthcare evaluation completed! Results saved with timestamp: {timestamp}"
+        f"\\nHealthcare evaluation completed! Results saved with timestamp: "
     )
     return all_results
 
 
 def generate_healthcare_report(results, timestamp):
     """Generate healthcare scenarios comparison report"""
-    with open(f"reports/healthcare_report_{timestamp}.txt", "w") as f:
+    with open(f"reports/healthcare_report_.txt", "w") as f:
         f.write("=== HEALTHCARE SCENARIOS EVALUATION REPORT ===\\n\\n")
 
         # Scenario information
@@ -196,7 +196,7 @@ def create_healthcare_visualizations(results, timestamp):
         if olb_scenario_results:
             viz.plot_performance_comparison(
                 olb_scenario_results,
-                f"plots/healthcare_scenarios_comparison_{timestamp}.png",
+                f"plots/healthcare_scenarios_comparison_.png",
             )
 
     print("Healthcare visualizations created!")

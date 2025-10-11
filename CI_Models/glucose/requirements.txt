@@ -1,7 +1,0 @@
-pandas
-numpy
-scipy
-numba
-statsmodels
-scikit-learn
-tensorflow

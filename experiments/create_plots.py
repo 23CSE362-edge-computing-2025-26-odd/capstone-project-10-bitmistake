@@ -60,7 +60,7 @@ for algo, metrics in results.items():
     print(metrics)
 
 # Create the plot
-output_path = f"../plots/performance_comparison_{timestamp}.png"
+output_path = f"../plots/performance_comparison_.png"
 viz.plot_performance_comparison(results, output_path)
 print(f"\nPlot saved to: {output_path}")
 

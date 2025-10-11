@@ -64,21 +64,28 @@ def main():
         num_fog_nodes=config.num_fog_nodes, seed=config.random_seed
     )
 
-    # --- CI MODEL INTEGRATION (Workload Predictor) ---
     logger.info("Running CI Model (LSTM Workload Predictor)...")
     ci_model = WorkloadPredictor(model_dir="CI_Models/Workload/models")
     workload_predictions = {}
 
-    for i, fog_node in enumerate(environment.fog_nodes):
-        node_name = f"system-{i+1}"
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def predict_single_node(node_index):
+        node_name = f"system-{node_index+1}"
         try:
-            result = ci_model.predict_future(
-                node_name, future_steps=200, plot=False, save_plot=False
-            )
-            workload_predictions[node_name] = result["stats"]
-            logger.info(f"Predicted workload for {node_name}: {result['stats']}")
+            result = ci_model.predict_future(node_name, future_steps=200, plot=False, save_plot=False)
+            return node_name, result["stats"]
         except Exception as e:
             logger.warning(f"Workload prediction failed for {node_name}: {e}")
+            return node_name, None
+
+    with ThreadPoolExecutor(max_workers=min(6, len(environment.fog_nodes))) as executor:
+        futures = [executor.submit(predict_single_node, i) for i in range(len(environment.fog_nodes))]
+        for future in as_completed(futures):
+            node_name, stats = future.result()
+            if stats:
+                workload_predictions[node_name] = stats
+                logger.info(f"Predicted workload for {node_name}: {stats}")
 
     # --- ADJUST FOG NODE CAPACITIES BASED ON PREDICTED WORKLOAD ---
     logger.info("Adjusting fog node capacities based on predicted workloads...")

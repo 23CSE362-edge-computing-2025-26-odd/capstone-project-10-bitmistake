@@ -219,7 +219,7 @@ class WorkloadPredictor:
         
         if save_plot:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            plot_path = f'prediction_{node_name}_{timestamp}.png'
+            plot_path = f'prediction_{node_name}_.png'
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
             print(f"Plot saved as {plot_path}")
         

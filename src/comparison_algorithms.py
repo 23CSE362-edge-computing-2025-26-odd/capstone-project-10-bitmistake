@@ -5,8 +5,6 @@ from yafs import Placement
 
 
 class RandomPlacement(Placement):
-    """Random placement algorithm for comparison"""
-
     def __init__(self, name, json_file, digital_twin):
         super().__init__(name, json_file)
         self.digital_twin = digital_twin
@@ -47,8 +45,6 @@ class RandomPlacement(Placement):
 
 
 class DistancePlacement(Placement):
-    """Distance-based placement for comparison"""
-
     def __init__(self, name, json_file, digital_twin):
         super().__init__(name, json_file)
         self.digital_twin = digital_twin
@@ -107,8 +103,6 @@ class DistancePlacement(Placement):
 
 
 class LoadBalancedPlacement(Placement):
-    """Simple load-balanced placement for comparison"""
-
     def __init__(self, name, json_file, digital_twin):
         super().__init__(name, json_file)
         self.digital_twin = digital_twin

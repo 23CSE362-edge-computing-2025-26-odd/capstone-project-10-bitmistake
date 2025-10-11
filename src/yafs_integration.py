@@ -84,7 +84,7 @@ def create_yafs_topology(digital_twin):
 
     if digital_twin.cloud_node is not None:
         cloud = digital_twin.cloud_node
-        topology.G.nodes["cloud"]["IPT"] = int(cloud.processing_power)
+        topology.G.nodes["cloud"]["IPT"] = int(cloud.processingPower)
         topology.G.nodes["cloud"]["RAM"] = 10000
         topology.G.nodes["cloud"]["STORAGE"] = 100000
 

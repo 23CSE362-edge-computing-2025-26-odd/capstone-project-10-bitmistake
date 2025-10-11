@@ -74,11 +74,11 @@ def run_algorithm_comparison():
     os.makedirs("reports", exist_ok=True)
     os.makedirs("plots", exist_ok=True)
 
-    with open(f"data/algorithm_comparison_{timestamp}.json", "w") as f:
+    with open(f"data/algorithm_comparison_.json", "w") as f:
         json.dump(results, f, indent=2, default=str)
 
     # Generate comparison report
-    with open(f"reports/comparison_report_{timestamp}.txt", "w") as f:
+    with open(f"reports/comparison_report_.txt", "w") as f:
         f.write("=== ALGORITHM COMPARISON REPORT ===\n\n")
 
         for alg_name, metrics in results.items():
@@ -100,10 +100,10 @@ def run_algorithm_comparison():
     visualizer = SimulationVisualizer()
     if results:
         visualizer.plot_performance_comparison(
-            results, f"plots/performance_comparison_{timestamp}.png"
+            results, f"plots/performance_comparison_.png"
         )
 
-    print(f"Evaluation completed! Results saved with timestamp: {timestamp}")
+    print(f"Evaluation completed! Results saved with timestamp: ")
     return results
 
 
