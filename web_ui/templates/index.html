@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fog Placement Simulator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>Fog Placement</h1>
+                <p>Simulator</p>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="single">
+                    <span class="nav-icon"></span>
+                    <span class="nav-text">Single Run</span>
+                </button>
+                <button class="nav-item" data-view="compare">
+                    <span class="nav-icon"></span>
+                    <span class="nav-text">Compare</span>
+                </button>
+                <button class="nav-item" data-view="analytics">
+                    <span class="nav-icon"></span>
+                    <span class="nav-text">Analytics</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span>Ready</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Single Run View -->
+            <div class="view-container active" id="singleView">
+                <header class="view-header">
+                    <h2>Single Algorithm Simulation</h2>
+                    <p>Run and visualize a single placement algorithm</p>
+                </header>
+
+                <div class="content-grid">
+                    <!-- Controls Panel -->
+                    <div class="control-panel">
+                        <div class="panel-card">
+                            <h3>Configuration</h3>
+                            
+                            <div class="form-group">
+                                <label>
+                                    <span>Sensors</span>
+                                    <span class="value-badge" id="singleSensorsValue">10</span>
+                                </label>
+                                <input type="range" id="singleSensors" min="5" max="30" value="10" step="1">
+                                <div class="range-labels">
+                                    <span>5</span>
+                                    <span>30</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <span>Fog Nodes</span>
+                                    <span class="value-badge" id="singleFogValue">4</span>
+                                </label>
+                                <input type="range" id="singleFogNodes" min="2" max="10" value="4" step="1">
+                                <div class="range-labels">
+                                    <span>2</span>
+                                    <span>10</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Algorithm</label>
+                                <select id="singleAlgorithm" class="select-input">
+                                    <option value="olb">OLB (Reactive)</option>
+                                    <option value="predictive">Predictive Latency</option>
+                                    <option value="random">Random Placement</option>
+                                    <option value="distance">Distance-Based</option>
+                                    <option value="loadbalanced">Load Balanced</option>
+                                    <option value="fnpa">FNPA</option>
+                                </select>
+                            </div>
+
+                            <button id="runSingle" class="btn-primary">
+                                <span class="btn-text">Run Simulation</span>
+                                <span class="btn-loader" style="display: none;">Running...</span>
+                            </button>
+                        </div>
+
+                        <!-- Metrics Panel -->
+                        <div class="panel-card metrics-card" id="singleMetrics" style="display: none;">
+                            <h3>Results</h3>
+                            <div class="metrics-grid">
+                                <div class="metric-item">
+                                    <div class="metric-info">
+                                        <span class="metric-label">Latency</span>
+                                        <span class="metric-value" id="singleLatency">-</span>
+                                        <span class="metric-unit">ms</span>
+                                    </div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-info">
+                                        <span class="metric-label">Energy</span>
+                                        <span class="metric-value" id="singleEnergy">-</span>
+                                        <span class="metric-unit">W</span>
+                                    </div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-info">
+                                        <span class="metric-label">Balance</span>
+                                        <span class="metric-value" id="singleBalance">-</span>
+                                    </div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-info">
+                                        <span class="metric-label">Network</span>
+                                        <span class="metric-value" id="singleNetwork">-</span>
+                                        <span class="metric-unit">MB/s</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visualization Panel -->
+                    <div class="viz-panel">
+                        <div class="panel-card full-height">
+                            <div class="viz-header">
+                                <h3>Network Topology</h3>
+                                <div class="viz-stats" id="singleStats" style="display: none;">
+                                    <span>Sensors: <strong id="singleSensorCount">0</strong></span>
+                                    <span>Fog: <strong id="singleFogCount">0</strong></span>
+                                    <span>Links: <strong id="singleLinkCount">0</strong></span>
+                                </div>
+                            </div>
+                            <div class="canvas-wrapper">
+                                <canvas id="singleCanvas"></canvas>
+                                <div class="canvas-legend">
+                                    <div class="legend-item">
+                                        <span class="legend-dot sensor"></span>
+                                        <span>Sensor</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-dot fog"></span>
+                                        <span>Fog Node</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-line"></span>
+                                        <span>Connection</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compare View -->
+            <div class="view-container" id="compareView">
+                <header class="view-header">
+                    <h2>Algorithm Comparison</h2>
+                    <p>Compare multiple algorithms side by side</p>
+                </header>
+
+                <div class="compare-controls">
+                    <div class="control-row">
+                        <div class="form-group inline">
+                            <label>Sensors: <span id="compareSensorsValue">10</span></label>
+                            <input type="range" id="compareSensors" min="5" max="30" value="10" step="1">
+                        </div>
+                        <div class="form-group inline">
+                            <label>Fog Nodes: <span id="compareFogValue">4</span></label>
+                            <input type="range" id="compareFogNodes" min="2" max="10" value="4" step="1">
+                        </div>
+                    </div>
+
+                    <div class="algorithm-selection">
+                        <label>Select Algorithms (2-6):</label>
+                        <div class="checkbox-grid">
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="olb" checked>
+                                <span>OLB</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="predictive" checked>
+                                <span>Predictive</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="random" checked>
+                                <span>Random</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="distance">
+                                <span>Distance</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="loadbalanced">
+                                <span>LoadBalanced</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="fnpa">
+                                <span>FNPA</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button id="runCompare" class="btn-primary">
+                        <span class="btn-text">Run Comparison</span>
+                        <span class="btn-loader" style="display: none;">Comparing...</span>
+                    </button>
+                </div>
+
+                <div class="improvement-banner" id="improvementBanner" style="display: none;">
+                    <span class="improvement-label" id="improvementLabel">Best Algorithm:</span>
+                    <span class="improvement-value" id="improvementValue">+0%</span>
+                </div>
+
+                <div class="comparison-results" id="comparisonResults">
+                    <div class="empty-state">
+                        <div class="empty-icon"></div>
+                        <h3>No Comparison Results</h3>
+                        <p>Run a comparison to see algorithm performance side by side</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics View -->
+            <div class="view-container" id="analyticsView">
+                <header class="view-header">
+                    <h2>Analytics Dashboard</h2>
+                    <p>Detailed performance comparison charts</p>
+                </header>
+
+                <div class="analytics-controls">
+                    <button id="generateChart" class="btn-primary">
+                        <span class="btn-text">Generate Charts</span>
+                        <span class="btn-loader" style="display: none;">Generating...</span>
+                    </button>
+                </div>
+
+                <div class="chart-container" id="chartContainer">
+                    <div class="chart-placeholder">
+                        <div class="placeholder-icon"></div>
+                        <h3>Analytics Dashboard</h3>
+                        <p>Run a comparison first, then generate detailed performance charts</p>
+                        <div class="placeholder-features">
+                            <div class="feature-item">
+                                <span class="feature-icon"></span>
+                                <span>Latency Analysis</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon"></span>
+                                <span>Energy Consumption</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon"></span>
+                                <span>Load Balancing</span>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon"></span>
+                                <span>Network Usage</span>
+                            </div>
+                        </div>
+                    </div>
+                    <img id="comparisonChart" style="display: none;">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
