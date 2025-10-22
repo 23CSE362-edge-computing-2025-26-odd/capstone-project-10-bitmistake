@@ -130,6 +130,13 @@ def run_olb_simulation():
     if workload_predictions:
         print("Adjusting fog node capacities based on predicted workloads...")
         
+        # Constants for capacity adjustment
+        CAPACITY_INCREASE_FACTOR = 0.3  # 30% increase for high-load nodes
+        CAPACITY_DECREASE_BASE = 0.7    # 70% base for low-load nodes
+        MIN_ADJUSTMENT_FACTOR = 0.6     # Minimum 60% of original capacity
+        MAX_ADJUSTMENT_FACTOR = 1.5     # Maximum 150% of original capacity
+        DEFAULT_AVG_LOAD = 50.0         # Default average load if no predictions
+        
         total_predicted_load = 0
         node_predictions = {}
         
@@ -140,7 +147,7 @@ def run_olb_simulation():
                 node_predictions[i] = predicted_load
                 total_predicted_load += predicted_load
         
-        avg_predicted_load = total_predicted_load / len(node_predictions) if node_predictions else 50.0
+        avg_predicted_load = total_predicted_load / len(node_predictions) if node_predictions else DEFAULT_AVG_LOAD
         
         for i, fog_node in enumerate(environment.fog_nodes):
             if i in node_predictions:
@@ -148,12 +155,13 @@ def run_olb_simulation():
                 
                 if predicted_load > avg_predicted_load:
                     load_ratio = predicted_load / max(avg_predicted_load, 1.0)
-                    adjustment_factor = 1.0 + (0.3 * (load_ratio - 1.0))
+                    adjustment_factor = 1.0 + (CAPACITY_INCREASE_FACTOR * (load_ratio - 1.0))
                 else:
                     load_ratio = predicted_load / max(avg_predicted_load, 1.0)
-                    adjustment_factor = 0.7 + (0.3 * load_ratio)
+                    adjustment_factor = CAPACITY_DECREASE_BASE + (CAPACITY_INCREASE_FACTOR * load_ratio)
                 
-                adjustment_factor = max(0.6, min(1.5, adjustment_factor))
+                # Clamp adjustment factor to safe bounds
+                adjustment_factor = max(MIN_ADJUSTMENT_FACTOR, min(MAX_ADJUSTMENT_FACTOR, adjustment_factor))
                 fog_node.processingPower *= adjustment_factor
         
         print("✓ Fog node capacity adjustments completed")
