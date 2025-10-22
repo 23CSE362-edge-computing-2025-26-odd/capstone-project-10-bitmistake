@@ -3,7 +3,7 @@ import os
 import statistics
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+# import matplotlib.patches as mpatches  # Not currently used
 import numpy as np
 from typing import Dict, List, Any
 

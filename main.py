@@ -27,6 +27,7 @@ from src import (
     save_results,
     HospitalVisualizationEngine,
 )
+from src.orchestrator import get_project_root
 from src.hospital_comparison import HospitalComparisonRunner
 from src.hospital_scenarios_extended import ScenarioManager
 from src.mqtt_simulator import MQTTSimulationEnvironment
@@ -207,11 +208,13 @@ def run_olb_simulation():
             },
         }
 
-        results_filename = "data/olb_simulation_results.json"
+        # Use absolute path for results file
+        import os
+        results_filename = os.path.join(get_project_root(), "data", "olb_simulation_results.json")
         with open(results_filename, "w") as f:
             json.dump(results, f, indent=2, default=str)
 
-        save_results(metrics, olb_placement, "reports/olb_simulation_report.txt")
+        save_results(metrics, olb_placement, os.path.join(get_project_root(), "reports", "olb_simulation_report.txt"))
 
         print("\n" + "=" * 80)
         print("OLB SIMULATION COMPLETED SUCCESSFULLY!")
@@ -249,6 +252,10 @@ def run_algorithm_comparison():
     ]
 
     placement_json = create_placement_json("config")
+    
+    # Initialize MQTT environment for algorithm comparison
+    mqtt_env = MQTTSimulationEnvironment()
+    mqtt_env.simulation_time = 0
 
     for algo_name, AlgoClass in algorithms:
         print(f"\n{'='*70}")

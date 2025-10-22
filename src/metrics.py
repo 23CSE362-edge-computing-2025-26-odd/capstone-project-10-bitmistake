@@ -203,6 +203,23 @@ class PerformanceMetrics:
             p99_index = int(len(sorted_latencies) * 0.99)
             self.latency_p99 = sorted_latencies[p99_index] if p99_index < len(sorted_latencies) else sorted_latencies[-1]
         
+        # Try to enhance metrics with YAFS output data
+        try:
+            from .yafs_output_parser import parse_yafs_output
+            yafs_metrics = parse_yafs_output("results", algorithm_name.lower())
+            
+            # Use actual YAFS metrics if available
+            if yafs_metrics["total_messages_processed"] > 0:
+                self.latency_min = yafs_metrics["actual_latency_min"]
+                self.latency_max = yafs_metrics["actual_latency_max"]
+                self.latency_p99 = yafs_metrics["actual_latency_p99"]
+                self.overall_latency = yafs_metrics["actual_latency_avg"]
+                print(f"[INFO] Enhanced metrics with YAFS output data: {yafs_metrics['total_messages_processed']} messages processed")
+        except ImportError:
+            print("[INFO] YAFS output parser not available, using calculated metrics")
+        except Exception as e:
+            print(f"[WARNING] Could not parse YAFS output: {e}")
+        
         # Calculate CPU and memory utilization
         if digital_twin.edge_nodes:
             total_capacity = sum(edge.processingPower for edge in digital_twin.edge_nodes)

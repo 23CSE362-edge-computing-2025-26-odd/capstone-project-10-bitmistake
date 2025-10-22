@@ -108,6 +108,7 @@ except ImportError as e:
             )
 from .yafs_integration import (create_smart_healthcare_application,
                                create_yafs_topology)
+from .yafs_output_parser import YAFSOutputParser, parse_yafs_output
 
 # Initialize algorithm registry with all available algorithms
 initialize_default_registry()
@@ -154,6 +155,9 @@ __all__ = [
     "register_algorithm",
     "get_algorithm",
     "initialize_default_registry",
+    # YAFS Output Parser
+    "YAFSOutputParser",
+    "parse_yafs_output",
 ]
 
 # Add optional imports to __all__ if available

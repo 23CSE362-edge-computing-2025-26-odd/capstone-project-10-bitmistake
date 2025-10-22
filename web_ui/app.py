@@ -23,7 +23,8 @@ from src import (
     create_yafs_topology,
     PerformanceMetrics,
     SimulationVisualizer,
-    PREDICTIVE_AVAILABLE
+    PREDICTIVE_AVAILABLE,
+    get_registry
 )
 from src.orchestrator import setup_directories
 
@@ -113,6 +114,17 @@ def simulate():
         placement_json = create_placement_json(config_dir)
         
         # Select the appropriate placement algorithm
+        # Create placement algorithm using registry
+        registry = get_registry()
+        algorithm_class = registry.get(algorithm)
+        
+        if algorithm_class is None:
+            return jsonify({
+                'success': False,
+                'error': f'Unknown algorithm: {algorithm}'
+            }), 400
+        
+        # Special handling for predictive algorithm
         if algorithm == 'predictive':
             if not PREDICTIVE_AVAILABLE or PredictiveLatencyPlacement is None:
                 return jsonify({
@@ -120,18 +132,8 @@ def simulate():
                     'error': 'Predictive algorithm is not available'
                 }), 400
             placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
-        elif algorithm == 'olb':
-            placement = OLBPlacement("OLB", placement_json, environment)
-        elif algorithm == 'lbs':
-            placement = LBS("LBS", placement_json, environment)
-        elif algorithm == 'lab':
-            placement = LAB("LAB", placement_json, environment)
-        elif algorithm == 'mec':
-            placement = MEC("MEC", placement_json, environment)
-        elif algorithm == 'fnpa':
-            placement = FNPA("FNPA", placement_json, environment)
         else:
-            placement = OLBPlacement("OLB", placement_json, environment)
+            placement = algorithm_class(algorithm.upper(), placement_json, environment)
         
         from yafs.core import Sim
         from yafs.population import Population
@@ -286,23 +288,23 @@ def compare_algorithms():
             
             # Select algorithm
             print(f"[DEBUG] Creating placement algorithm: {algorithm}")
+            
+            # Use registry to get algorithm class
+            registry = get_registry()
+            algorithm_class = registry.get(algorithm)
+            
+            if algorithm_class is None:
+                print(f"[ERROR] Unknown algorithm: {algorithm}")
+                continue
+            
+            # Special handling for predictive algorithm
             if algorithm == 'predictive':
                 if not PREDICTIVE_AVAILABLE or PredictiveLatencyPlacement is None:
                     print(f"[ERROR] Predictive algorithm not available")
                     continue
                 placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
-            elif algorithm == 'olb':
-                placement = OLBPlacement("OLB", placement_json, environment)
-            elif algorithm == 'lbs':
-                placement = LBS("LBS", placement_json, environment)
-            elif algorithm == 'lab':
-                placement = LAB("LAB", placement_json, environment)
-            elif algorithm == 'mec':
-                placement = MEC("MEC", placement_json, environment)
-            elif algorithm == 'fnpa':
-                placement = FNPA("FNPA", placement_json, environment)
             else:
-                placement = OLBPlacement("OLB", placement_json, environment)
+                placement = algorithm_class(algorithm.upper(), placement_json, environment)
             
             print(f"[DEBUG] Placement class: {placement.__class__.__name__}")
             
