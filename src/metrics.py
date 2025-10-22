@@ -160,10 +160,10 @@ class PerformanceMetrics:
         self.logger.info(f"Total edge nodes in environment: {len(digital_twin.edge_nodes)}")
         self.logger.info(f"Module assignments: {len(placement.module_assignments)} nodes have assignments")
         
-        # Check if assignments are empty - generate synthetic workload if needed
+        # Check if assignments are empty - raise error instead of generating synthetic data
         if not placement.module_assignments or all(len(sensors) == 0 for sensors in placement.module_assignments.values()):
-            self.logger.warning("[WARNING] NO ASSIGNMENTS FOUND! Generating synthetic workload...")
-            self._generate_synthetic_workload(digital_twin, placement)
+            self.logger.error(f"[ERROR] Placement algorithm {algorithm_name} failed to assign any sensors!")
+            raise ValueError(f"Placement algorithm {algorithm_name} failed to assign any sensors!")
         
         # Count total assignments
         total_assignments = sum(len(sensors) for sensors in placement.module_assignments.values())
@@ -259,10 +259,15 @@ class PerformanceMetrics:
         )
         self.max_utilization = max(node_utilizations) if node_utilizations else 0
 
+        # Cost calculation with named constants
+        LATENCY_WEIGHT = 0.1
+        NETWORK_WEIGHT = 0.05
+        ENERGY_WEIGHT = 0.02
+        
         self.cost_of_execution = (
-            self.overall_latency * 0.1
-            + self.network_usage * 0.05
-            + self.energy_consumption * 0.02
+            self.overall_latency * LATENCY_WEIGHT
+            + self.network_usage * NETWORK_WEIGHT
+            + self.energy_consumption * ENERGY_WEIGHT
         )
         
         # Log comprehensive metrics summary
@@ -307,22 +312,24 @@ class PerformanceMetrics:
             p99_index = int(len(sorted_latencies) * 0.99)
             self.latency_p99 = sorted_latencies[p99_index] if p99_index < len(sorted_latencies) else sorted_latencies[-1]
         
-        # Try to enhance metrics with YAFS output data
+        # Try to enhance metrics with YAFS output data if available
         try:
             from .yafs_output_parser import parse_yafs_output
             yafs_metrics = parse_yafs_output("results", algorithm_name.lower())
             
-            # Use actual YAFS metrics if available
+            # Use actual YAFS metrics only if data was found
             if yafs_metrics["total_messages_processed"] > 0:
                 self.latency_min = yafs_metrics["actual_latency_min"]
                 self.latency_max = yafs_metrics["actual_latency_max"]
                 self.latency_p99 = yafs_metrics["actual_latency_p99"]
                 self.overall_latency = yafs_metrics["actual_latency_avg"]
-                print(f"[INFO] Enhanced metrics with YAFS output data: {yafs_metrics['total_messages_processed']} messages processed")
+                self.logger.info(f"Enhanced metrics with YAFS output data: {yafs_metrics['total_messages_processed']} messages processed")
+            else:
+                self.logger.info("YAFS output files not found, using calculated metrics (this is normal)")
         except ImportError:
-            print("[INFO] YAFS output parser not available, using calculated metrics")
+            self.logger.info("YAFS output parser not available, using calculated metrics")
         except Exception as e:
-            print(f"[WARNING] Could not parse YAFS output: {e}")
+            self.logger.debug(f"Could not parse YAFS output (using calculated metrics): {e}")
         
         # Calculate CPU and memory utilization
         if digital_twin.edge_nodes:
@@ -379,27 +386,33 @@ DETAILED ASSIGNMENT ANALYSIS:
         report += "\n=\n"
         return report
 
-    def _generate_synthetic_workload(self, digital_twin, placement):
-        """Generate synthetic workload when placement algorithm fails"""
-        import random
+
+    
+    def calculate_sla_compliance(self, sla_threshold_ms: float = 100.0) -> float:
+        """
+        Calculate SLA compliance percentage based on latency threshold.
         
-        self.logger.warning("Generating synthetic workload distribution...")
-        placement.module_assignments = {}
-        
-        # Distribute sensors across edge nodes using round-robin
-        for i, sensor in enumerate(digital_twin.sensors):
-            node_id = i % len(digital_twin.edge_nodes)
+        Args:
+            sla_threshold_ms: Maximum acceptable latency in milliseconds
             
-            if node_id not in placement.module_assignments:
-                placement.module_assignments[node_id] = []
-            
-            placement.module_assignments[node_id].append(sensor)
-            self.logger.debug(f"Synthetic: Assigned Sensor {sensor.device_id} -> Node {node_id}")
+        Returns:
+            Percentage of tasks meeting SLA (0-100)
+        """
+        if not self.per_task_latencies:
+            return 100.0
         
-        self.logger.warning(f"[OK] Synthetic workload created: {len(digital_twin.sensors)} sensors distributed across {len(digital_twin.edge_nodes)} nodes")
+        compliant_tasks = sum(1 for latency in self.per_task_latencies if latency <= sla_threshold_ms)
+        compliance_percent = (compliant_tasks / len(self.per_task_latencies)) * 100
+        
+        self.logger.info(f"SLA Compliance: {compliant_tasks}/{len(self.per_task_latencies)} tasks under {sla_threshold_ms}ms = {compliance_percent:.2f}%")
+        
+        return compliance_percent
     
     def get_summary_dict(self):
         """Get comprehensive metrics as dictionary"""
+        # Calculate SLA compliance
+        sla_compliance_percent = self.calculate_sla_compliance()
+        
         return {
             "algorithm": self.algorithm_name,
             "overall_latency": self.overall_latency,
@@ -416,6 +429,7 @@ DETAILED ASSIGNMENT ANALYSIS:
             "max_utilization": self.max_utilization,
             "cpu_utilization": self.cpu_utilization,
             "memory_utilization": self.memory_utilization,
+            "sla_compliance_percent": sla_compliance_percent,
             "num_assignments": len(self.detailed_assignments),
             "detailed_assignments": self.detailed_assignments,
             "tasks_generated": self.tasks_generated,

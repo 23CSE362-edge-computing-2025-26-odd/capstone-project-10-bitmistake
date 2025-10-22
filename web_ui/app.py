@@ -13,26 +13,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src import (
     DigitalTwinEnvironment,
-    OLBPlacement,
-    LBS,
-    LAB,
-    MEC,
-    FNPA,
     create_placement_json,
     create_smart_healthcare_application,
     create_yafs_topology,
     PerformanceMetrics,
     SimulationVisualizer,
     PREDICTIVE_AVAILABLE,
-    get_registry
 )
+from src.algorithm_registry import get_registry, initialize_default_registry
 from src.orchestrator import setup_directories
 
-# Import PredictiveLatencyPlacement only if available
-if PREDICTIVE_AVAILABLE:
-    from src import PredictiveLatencyPlacement
-else:
-    PredictiveLatencyPlacement = None
+# Initialize algorithm registry on module load
+initialize_default_registry()
+print(f"[INFO] Web UI: Initialized algorithm registry with {len(get_registry())} algorithms")
 
 app = Flask(__name__)
 CORS(app)
@@ -105,18 +98,28 @@ def simulate():
         
         print(f"[INFO] Environment initialized with {len(environment.sensors)} sensors and {len(environment.edge_nodes)} edge nodes")
         
+        # Initialize MQTT environment
+        from src.mqtt_simulator import MQTTSimulationEnvironment
+        mqtt_env = MQTTSimulationEnvironment()
+        mqtt_env.publish_simulation_start({
+            "algorithm": algorithm,
+            "num_sensors": num_sensors,
+            "num_edge_nodes": num_edge_nodes,
+            "source": "web_ui"
+        })
+        
         app_obj = create_smart_healthcare_application(environment)
         topology = create_yafs_topology(environment)
         
         # Setup directories using orchestrator
         setup_directories(["config", "results"])
         
+        config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
         placement_json = create_placement_json(config_dir)
         
-        # Select the appropriate placement algorithm
         # Create placement algorithm using registry
         registry = get_registry()
-        algorithm_class = registry.get(algorithm)
+        algorithm_class = registry.get(algorithm.upper())
         
         if algorithm_class is None:
             return jsonify({
@@ -126,12 +129,12 @@ def simulate():
         
         # Special handling for predictive algorithm
         if algorithm == 'predictive':
-            if not PREDICTIVE_AVAILABLE or PredictiveLatencyPlacement is None:
+            if not PREDICTIVE_AVAILABLE:
                 return jsonify({
                     'success': False,
                     'error': 'Predictive algorithm is not available'
                 }), 400
-            placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
+            placement = algorithm_class("Predictive", placement_json, environment, prediction_horizon=10)
         else:
             placement = algorithm_class(algorithm.upper(), placement_json, environment)
         
@@ -141,17 +144,35 @@ def simulate():
         # Results directory already created by setup_directories
         results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
         
+        # Use constant for simulation time
+        from src.common_utils import PlacementConstants
+        
         s = Sim(topology, default_results_path=os.path.join(results_dir, f"sim_{algorithm}"))
         population = Population(name="WebUI")
+        
+        # Connect MQTT and publish placement decisions
+        mqtt_env.connect_to_yafs_simulation(s)
+        
         s.deploy_app(app_obj, placement, population)
-        s.run(until=200)
+        
+        # Publish placement decisions to MQTT
+        mqtt_env.publish_placement_decisions(placement, environment)
+        
+        s.run(until=PlacementConstants.DEFAULT_SIMULATION_TIME)
+        
+        # Advance MQTT time
+        mqtt_env.advance_time(PlacementConstants.DEFAULT_SIMULATION_TIME * 1000)
         
         print(f"[INFO] Simulation completed, collecting metrics...")
         
         metrics = PerformanceMetrics()
         metrics.collect_metrics(environment, placement, algorithm)
         
+        # Publish final metrics to MQTT
+        mqtt_env.publish_simulation_end(metrics.get_summary_dict())
+        
         result = metrics.get_summary_dict()
+        result['mqtt_statistics'] = mqtt_env.get_statistics()
         
         print(f"[INFO] Metrics collected: {result}")
         
@@ -259,6 +280,17 @@ def compare_algorithms():
         print(f"[INFO] Starting comparison with {num_sensors} sensors and {num_edge_nodes} edge nodes")
         print(f"[INFO] Comparing algorithms: {algorithms_to_compare}")
         
+        # Initialize MQTT environment for comparison
+        from src.mqtt_simulator import MQTTSimulationEnvironment
+        mqtt_env = MQTTSimulationEnvironment()
+        mqtt_env.publish_simulation_start({
+            "type": "comparison",
+            "algorithms": algorithms_to_compare,
+            "num_sensors": num_sensors,
+            "num_edge_nodes": num_edge_nodes,
+            "source": "web_ui"
+        })
+        
         results = {}
         
         # Create ONE environment that all algorithms will use (same seed for fair comparison)
@@ -286,12 +318,10 @@ def compare_algorithms():
             config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
             placement_json = create_placement_json(config_dir)
             
-            # Select algorithm
-            print(f"[DEBUG] Creating placement algorithm: {algorithm}")
-            
             # Use registry to get algorithm class
+            print(f"[DEBUG] Creating placement algorithm: {algorithm}")
             registry = get_registry()
-            algorithm_class = registry.get(algorithm)
+            algorithm_class = registry.get(algorithm.upper())
             
             if algorithm_class is None:
                 print(f"[ERROR] Unknown algorithm: {algorithm}")
@@ -299,10 +329,10 @@ def compare_algorithms():
             
             # Special handling for predictive algorithm
             if algorithm == 'predictive':
-                if not PREDICTIVE_AVAILABLE or PredictiveLatencyPlacement is None:
+                if not PREDICTIVE_AVAILABLE:
                     print(f"[ERROR] Predictive algorithm not available")
                     continue
-                placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
+                placement = algorithm_class("Predictive", placement_json, environment, prediction_horizon=10)
             else:
                 placement = algorithm_class(algorithm.upper(), placement_json, environment)
             
@@ -317,11 +347,20 @@ def compare_algorithms():
             s = Sim(topology, default_results_path=os.path.join(results_dir, f"compare_{algorithm}"))
             population = Population(name=f"Compare_{algorithm}")
             
+            # Connect MQTT
+            mqtt_env.connect_to_yafs_simulation(s)
+            
             print(f"[DEBUG] Deploying app for {algorithm}...")
             s.deploy_app(app_obj, placement, population)
             
+            # Publish placement decisions
+            mqtt_env.publish_placement_decisions(placement, environment)
+            
             print(f"[DEBUG] Running simulation for {algorithm}...")
-            s.run(until=200)
+            s.run(until=PlacementConstants.DEFAULT_SIMULATION_TIME)
+            
+            # Advance MQTT time
+            mqtt_env.advance_time(PlacementConstants.DEFAULT_SIMULATION_TIME * 1000)
             
             print(f"[DEBUG] Collecting metrics for {algorithm}...")
             print(f"[DEBUG] Placement has {len(placement.module_assignments)} edge nodes with assignments")
@@ -403,6 +442,15 @@ def compare_algorithms():
                           results[best_algorithm]['metrics']['overall_latency']) / 
                          results[worst_algorithm]['metrics']['overall_latency']) * 100
         
+        # Publish comparison summary to MQTT
+        comparison_summary = {
+            "best_algorithm": best_algorithm,
+            "worst_algorithm": worst_algorithm,
+            "improvement_percent": improvement,
+            "algorithms_compared": list(results.keys())
+        }
+        mqtt_env.publish_simulation_end(comparison_summary)
+        
         comparison_results.update(results)
         
         print(f"[INFO] Comparison complete. Best: {best_algorithm}, Worst: {worst_algorithm}, Improvement: {improvement:.2f}%")
@@ -412,7 +460,8 @@ def compare_algorithms():
             'results': results,
             'improvement': improvement,
             'best_algorithm': best_algorithm,
-            'worst_algorithm': worst_algorithm
+            'worst_algorithm': worst_algorithm,
+            'mqtt_statistics': mqtt_env.get_statistics()
         })
         
     except Exception as e:
@@ -572,6 +621,93 @@ def environment_info():
         'predictiveAvailable': PREDICTIVE_AVAILABLE
     })
 
+@app.route('/api/mqtt/status', methods=['GET'])
+def mqtt_status():
+    """Get MQTT broker status and statistics"""
+    try:
+        from src.mqtt_simulator import MQTTSimulationEnvironment
+        
+        # Create temporary MQTT environment to show capabilities
+        mqtt_env = MQTTSimulationEnvironment()
+        
+        return jsonify({
+            'success': True,
+            'mqtt_enabled': True,
+            'broker_info': {
+                'type': 'Simulated MQTT Broker',
+                'features': [
+                    'Pub/Sub messaging',
+                    'Topic wildcards (+ and #)',
+                    'QoS levels (0, 1, 2)',
+                    'Retained messages',
+                    'Message history'
+                ],
+                'topics': [
+                    'sensor/{sensor_id}/reading',
+                    'placement/{algorithm}/summary',
+                    'placement/sensor_{id}/assignment',
+                    'simulation/lifecycle/start',
+                    'simulation/lifecycle/end',
+                    'simulation/metrics'
+                ]
+            },
+            'statistics': mqtt_env.get_statistics()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/mqtt/messages', methods=['GET'])
+def mqtt_messages():
+    """Get recent MQTT messages from last simulation"""
+    try:
+        import os
+        import json
+        from pathlib import Path
+        
+        # Try to read the most recent MQTT log
+        logs_dir = Path("logs")
+        if not logs_dir.exists():
+            return jsonify({
+                'success': True,
+                'messages': [],
+                'note': 'No MQTT logs found. Run a simulation first.'
+            })
+        
+        # Find most recent MQTT log file
+        mqtt_logs = list(logs_dir.glob("*_mqtt_log.json"))
+        if not mqtt_logs:
+            return jsonify({
+                'success': True,
+                'messages': [],
+                'note': 'No MQTT logs found. Run a simulation first.'
+            })
+        
+        # Get most recent log
+        latest_log = max(mqtt_logs, key=lambda p: p.stat().st_mtime)
+        
+        with open(latest_log, 'r') as f:
+            log_data = json.load(f)
+        
+        # Return last 50 messages
+        messages = log_data.get('messages', [])[-50:]
+        
+        return jsonify({
+            'success': True,
+            'log_file': str(latest_log),
+            'total_messages': log_data.get('total_messages', 0),
+            'simulation_time': log_data.get('simulation_time', 0),
+            'broker_stats': log_data.get('broker_stats', {}),
+            'recent_messages': messages
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/test-algorithms', methods=['GET'])
 def test_algorithms():
     """Test endpoint to verify algorithms produce different results"""
@@ -594,11 +730,15 @@ def test_algorithms():
         
         test_results = {}
         
-        for alg_name, alg_class in [
-            ('olb', OLBPlacement),
-            ('predictive', lambda n, j, e: PredictiveLatencyPlacement(n, j, e, prediction_horizon=10)),
-            ('lbs', LBS)
-        ]:
+        registry = get_registry()
+        test_algorithms = ['OLB', 'LBS']
+        if PREDICTIVE_AVAILABLE:
+            test_algorithms.insert(1, 'Predictive')
+        
+        for alg_name in test_algorithms:
+            alg_class = registry.get(alg_name)
+            if alg_class is None:
+                continue
             # Create fresh environment
             test_env = DigitalTwinEnvironment(3000, 2000)
             test_env.initialize_sensors(5, seed=42)
@@ -608,8 +748,8 @@ def test_algorithms():
             test_app = create_smart_healthcare_application(test_env)
             test_topo = create_yafs_topology(test_env)
             
-            if alg_name == 'predictive':
-                placement = alg_class(alg_name, placement_json, test_env)
+            if alg_name == 'Predictive':
+                placement = alg_class(alg_name, placement_json, test_env, prediction_horizon=10)
             else:
                 placement = alg_class(alg_name, placement_json, test_env)
             
@@ -622,7 +762,7 @@ def test_algorithms():
             s = Sim(test_topo, default_results_path=os.path.join(results_dir, f"test_{alg_name}"))
             pop = Population(name=f"Test_{alg_name}")
             s.deploy_app(test_app, placement, pop)
-            s.run(until=100)
+            s.run(until=PlacementConstants.DEFAULT_SIMULATION_TIME // 2)  # Half time for testing
             
             # Get assignment distribution
             distribution = {}

@@ -193,36 +193,119 @@ class MQTTSimulationEnvironment:
         self.yafs_sim = yafs_sim
         print("[INFO] MQTT environment connected to YAFS simulation")
     
-    def on_yafs_message_created(self, message):
-        """Callback for when YAFS creates a new message"""
-        # Extract sensor ID from message name if it follows pattern
-        if "sensor_msg_" in message.name:
-            sensor_id = message.name.replace("sensor_msg_", "")
-            reading = {
-                "message_id": message.name,
-                "size_bytes": message.bytes,
-                "instructions": message.instructions
+    def publish_placement_decisions(self, placement, digital_twin):
+        """
+        Publish all placement decisions to MQTT after placement algorithm runs.
+        This is the main integration point between placement and MQTT.
+        """
+        print("[INFO] Publishing placement decisions to MQTT...")
+        
+        # Publish each sensor-to-edge assignment
+        for edge_id, sensors in placement.module_assignments.items():
+            edge_node = digital_twin.edge_nodes[edge_id] if edge_id < len(digital_twin.edge_nodes) else None
+            
+            for sensor in sensors:
+                assignment_info = {
+                    "algorithm": placement.name,
+                    "edge_node_id": edge_id,
+                    "edge_node_coordinates": edge_node.coordinates if edge_node else None,
+                    "sensor_coordinates": sensor.coordinates,
+                    "distance": self._calculate_distance(sensor.coordinates, edge_node.coordinates) if edge_node else None,
+                    "sensor_power": sensor.transmissionPower,
+                    "edge_capacity": edge_node.processingPower if edge_node else None
+                }
+                
+                self.publish_placement_assignment(sensor.device_id, edge_id, assignment_info)
+        
+        # Publish summary statistics
+        total_assignments = sum(len(sensors) for sensors in placement.module_assignments.values())
+        summary = {
+            "algorithm": placement.name,
+            "total_sensors": len(digital_twin.sensors),
+            "total_edge_nodes": len(digital_twin.edge_nodes),
+            "total_assignments": total_assignments,
+            "assignments_per_node": {
+                edge_id: len(sensors) 
+                for edge_id, sensors in placement.module_assignments.items()
             }
-            self.publish_sensor_reading(sensor_id, "unknown", reading)
+        }
+        
+        topic = f"placement/{placement.name}/summary"
+        self.broker.publish("placement_system", topic, summary, qos=1, retain=True)
+        self.messages_sent.append({
+            "topic": topic,
+            "time": self.simulation_time,
+            "payload": summary
+        })
+        
+        print(f"[INFO] Published {total_assignments} placement assignments to MQTT")
     
-    def on_yafs_message_delivered(self, message):
-        """Callback for when YAFS delivers a message"""
-        if "result_msg_" in message.name:
-            sensor_id = message.name.replace("result_msg_", "")
-            result_data = {
-                "message_id": message.name,
-                "delivery_time": self.simulation_time,
-                "processing_complete": True
-            }
-            self.publish_placement_assignment(sensor_id, "edge_node", result_data)
+    def publish_simulation_start(self, config: dict):
+        """Publish simulation start event"""
+        topic = "simulation/lifecycle/start"
+        payload = {
+            "timestamp": self.simulation_time,
+            "config": config,
+            "event": "simulation_started"
+        }
+        self.broker.publish("simulation", topic, payload, qos=1, retain=False)
+        self.messages_sent.append({
+            "topic": topic,
+            "time": self.simulation_time,
+            "payload": payload
+        })
     
-    def on_yafs_module_deployed(self, module_name, node_name):
-        """Callback for when YAFS deploys a module"""
-        if "Processing_Module_Sensor_" in module_name:
-            sensor_id = module_name.replace("Processing_Module_Sensor_", "")
-            deployment_info = {
-                "module": module_name,
-                "node": node_name,
-                "deployment_time": self.simulation_time
-            }
-            self.publish_placement_assignment(sensor_id, node_name, deployment_info) 
+    def publish_simulation_end(self, metrics: dict):
+        """Publish simulation end event with final metrics"""
+        topic = "simulation/lifecycle/end"
+        payload = {
+            "timestamp": self.simulation_time,
+            "metrics": metrics,
+            "event": "simulation_completed"
+        }
+        self.broker.publish("simulation", topic, payload, qos=1, retain=False)
+        self.messages_sent.append({
+            "topic": topic,
+            "time": self.simulation_time,
+            "payload": payload
+        })
+    
+    def subscribe_to_sensor_readings(self, callback: Callable):
+        """Subscribe to all sensor readings"""
+        self.broker.subscribe("subscriber", "sensor/+/reading", callback)
+    
+    def subscribe_to_placement_updates(self, callback: Callable):
+        """Subscribe to placement assignment updates"""
+        self.broker.subscribe("subscriber", "placement/#", callback)
+    
+    def subscribe_to_simulation_events(self, callback: Callable):
+        """Subscribe to simulation lifecycle events"""
+        self.broker.subscribe("subscriber", "simulation/#", callback)
+    
+    @staticmethod
+    def _calculate_distance(coord1, coord2):
+        """Calculate Euclidean distance between two coordinates"""
+        import math
+        return math.sqrt((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2)
+    
+    def export_mqtt_log(self, filename: str = "mqtt_messages.json"):
+        """Export all MQTT messages to JSON file"""
+        import json
+        from pathlib import Path
+        
+        log_data = {
+            "simulation_time": self.simulation_time,
+            "total_messages": len(self.messages_sent),
+            "broker_stats": self.broker.get_stats(),
+            "messages": self.messages_sent
+        }
+        
+        # Ensure logs directory exists
+        Path("logs").mkdir(exist_ok=True)
+        filepath = Path("logs") / filename
+        
+        with open(filepath, 'w') as f:
+            json.dump(log_data, f, indent=2)
+        
+        print(f"[INFO] MQTT log exported to {filepath}")
+        return str(filepath) 

@@ -167,6 +167,26 @@ class PlacementConstants:
     # Batch sizes
     DEFAULT_BATCH_SIZE = 10
     MAX_BATCH_SIZE = 100
+    
+    # Workload prediction constants (from main.py)
+    CAPACITY_INCREASE_FACTOR = 0.3  # 30% increase for high-load nodes
+    CAPACITY_DECREASE_BASE = 0.7    # 70% base for low-load nodes
+    DEFAULT_AVG_LOAD = 50.0         # Default average load if no predictions
+    
+    # Simulation defaults
+    DEFAULT_SIMULATION_TIME = 200  # Default simulation time in time units
+    DEFAULT_ENVIRONMENT_WIDTH = 3000
+    DEFAULT_ENVIRONMENT_HEIGHT = 2000
+    
+    # SLA thresholds
+    DEFAULT_SLA_LATENCY_MS = 100.0  # Default SLA latency threshold
+    
+    # File extensions
+    JSON_EXT = '.json'
+    CSV_EXT = '.csv'
+    H5_EXT = '.h5'
+    TFLITE_EXT = '.tflite'
+    PKL_EXT = '.pkl'
 
 
 def validate_coordinates(coordinates: Tuple[float, float], width: float, height: float) -> bool:
@@ -254,3 +274,45 @@ def profile_execution(func: Callable) -> Callable:
     
     return wrapper
 
+
+def cleanup_temporary_files(directories: List[str] = None) -> int:
+    """
+    Clean up temporary files and caches.
+    
+    Resolves Minor Issue #44.
+    
+    Args:
+        directories: List of directories to clean (defaults to temp directories)
+        
+    Returns:
+        Number of files deleted
+    """
+    import os
+    import shutil
+    
+    if directories is None:
+        directories = ["__pycache__", ".pytest_cache"]
+    
+    files_deleted = 0
+    
+    for directory in directories:
+        if directory.startswith("*"):
+            # Handle wildcard patterns
+            import glob
+            for file_path in glob.glob(f"**/{directory}", recursive=True):
+                try:
+                    os.remove(file_path)
+                    files_deleted += 1
+                except Exception as e:
+                    print(f"[WARNING] Could not delete {file_path}: {e}")
+        else:
+            # Handle directories
+            if os.path.exists(directory):
+                try:
+                    shutil.rmtree(directory)
+                    files_deleted += 1
+                    print(f"[INFO] Cleaned up directory: {directory}")
+                except Exception as e:
+                    print(f"[WARNING] Could not clean {directory}: {e}")
+    
+    return files_deleted

@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "Workload"))
 
 # --- SRC IMPORTS ---
-from src.comparison_algorithms import LAB, FNPA, MEC, LBS
 from src import (
     DigitalTwinEnvironment,
     OLBPlacement,
@@ -31,6 +30,7 @@ from src.orchestrator import get_project_root
 from src.hospital_comparison import HospitalComparisonRunner
 from src.hospital_scenarios_extended import ScenarioManager
 from src.mqtt_simulator import MQTTSimulationEnvironment
+from src.algorithm_registry import get_registry, initialize_default_registry
 
 # --- CI MODEL IMPORT (OPTIONAL) ---
 try:
@@ -56,8 +56,13 @@ def get_or_create_workload_predictor(model_dir: str = "CI_Models/Workload/models
 def clear_workload_predictor_cache():
     """Clear the workload predictor cache to prevent memory leaks."""
     global _cached_workload_predictor
-    _cached_workload_predictor = None
-    print("[INFO] Workload predictor cache cleared")
+    if _cached_workload_predictor is not None:
+        _cached_workload_predictor = None
+        print("[INFO] Workload predictor cache cleared")
+        
+        import gc
+        gc.collect()
+        print("[INFO] Garbage collection completed")
 
 
 def setup_directories():
@@ -74,6 +79,15 @@ def run_olb_simulation():
     print("=" * 80)
 
     config = SimulationConfig()
+    
+    # Validate configuration before running simulation
+    from src.common_utils import validate_simulation_config
+    validation_errors = validate_simulation_config(config)
+    if validation_errors:
+        print("[ERROR] Configuration validation failed:")
+        for error in validation_errors:
+            print(f"  - {error}")
+        return 1
 
     # --- CREATE DIGITAL TWIN ENVIRONMENT ---
     print("Creating digital twin environment...")
@@ -130,12 +144,13 @@ def run_olb_simulation():
     if workload_predictions:
         print("Adjusting edge node capacities based on predicted workloads...")
         
-        # Constants for capacity adjustment
-        CAPACITY_INCREASE_FACTOR = 0.3  # 30% increase for high-load nodes
-        CAPACITY_DECREASE_BASE = 0.7    # 70% base for low-load nodes
-        MIN_ADJUSTMENT_FACTOR = 0.6     # Minimum 60% of original capacity
-        MAX_ADJUSTMENT_FACTOR = 1.5     # Maximum 150% of original capacity
-        DEFAULT_AVG_LOAD = 50.0         # Default average load if no predictions
+        # Import constants for capacity adjustment
+        from src.common_utils import PlacementConstants
+        CAPACITY_INCREASE_FACTOR = PlacementConstants.CAPACITY_INCREASE_FACTOR
+        CAPACITY_DECREASE_BASE = PlacementConstants.CAPACITY_DECREASE_BASE
+        MIN_ADJUSTMENT_FACTOR = PlacementConstants.MIN_CAPACITY_FACTOR
+        MAX_ADJUSTMENT_FACTOR = PlacementConstants.MAX_CAPACITY_FACTOR
+        DEFAULT_AVG_LOAD = PlacementConstants.DEFAULT_AVG_LOAD
         
         total_predicted_load = 0
         node_predictions = {}
@@ -176,6 +191,18 @@ def run_olb_simulation():
         name="OLB_Healthcare", json_file=placement_json, digital_twin=environment
     )
 
+    # Initialize MQTT environment
+    mqtt_env = MQTTSimulationEnvironment()
+    mqtt_env.simulation_time = 0
+    
+    # Publish simulation start event
+    mqtt_env.publish_simulation_start({
+        "algorithm": "OLB",
+        "num_sensors": len(environment.sensors),
+        "num_edge_nodes": len(environment.edge_nodes),
+        "simulation_time": config.simulation_time
+    })
+
     try:
         from yafs.core import Sim
         from yafs.population import Population
@@ -184,13 +211,30 @@ def run_olb_simulation():
 
         s = Sim(topology, default_results_path="results/")
         population = Population(name="HealthcareSensors")
+        
+        # Connect MQTT to YAFS
+        mqtt_env.connect_to_yafs_simulation(s)
+        
         s.deploy_app(app, olb_placement, population)
+        
+        # Publish placement decisions to MQTT
+        mqtt_env.publish_placement_decisions(olb_placement, environment)
+        
         s.run(until=config.simulation_time)
+        
+        # Advance MQTT simulation time
+        mqtt_env.advance_time(config.simulation_time * 1000)
 
         print("Collecting simulation results...")
         metrics = PerformanceMetrics()
         metrics.collect_metrics(environment, olb_placement, "OLB")
 
+        # Publish final metrics to MQTT
+        mqtt_env.publish_simulation_end(metrics.get_summary_dict())
+        
+        # Export MQTT log
+        mqtt_log_file = mqtt_env.export_mqtt_log("olb_mqtt_log.json")
+        
         results = {
             "simulation_config": config.to_dict(),
             "ci_predictions": workload_predictions,
@@ -201,6 +245,8 @@ def run_olb_simulation():
                 "edge_node_coordinates": [f.coordinates for f in environment.edge_nodes],
             },
             "performance_metrics": metrics.get_summary_dict(),
+            "mqtt_statistics": mqtt_env.get_statistics(),
+            "mqtt_log_file": mqtt_log_file,
             "simulation_metadata": {
                 "simulation_time": config.simulation_time,
                 "framework": "YAFS 1.0",
@@ -209,22 +255,17 @@ def run_olb_simulation():
         }
 
         # Use absolute path for results file
-        import os
-        results_filename = os.path.join(get_project_root(), "data", "olb_simulation_results.json")
+        results_filename = str(get_project_root() / "data" / "olb_simulation_results.json")
         with open(results_filename, "w") as f:
             json.dump(results, f, indent=2, default=str)
 
-        save_results(metrics, olb_placement, os.path.join(get_project_root(), "reports", "olb_simulation_report.txt"))
+        save_results(metrics, olb_placement, str(get_project_root() / "reports" / "olb_simulation_report.txt"))
 
         print("\n" + "=" * 80)
         print("OLB SIMULATION COMPLETED SUCCESSFULLY!")
         print(f"Results saved to: {results_filename}")
         print("=" * 80)
         
-        # Clear cache to free memory
-        if WORKLOAD_PREDICTOR_AVAILABLE:
-            clear_workload_predictor_cache()
-
         return 0
 
     except ImportError as e:
@@ -235,6 +276,10 @@ def run_olb_simulation():
         import traceback
         traceback.print_exc()
         return 1
+    finally:
+        # Always clear cache to free memory
+        if WORKLOAD_PREDICTOR_AVAILABLE:
+            clear_workload_predictor_cache()
 
 
 def run_algorithm_comparison():
@@ -244,20 +289,37 @@ def run_algorithm_comparison():
     print("=" * 80)
 
     config = SimulationConfig()
-    algorithms = [
-        ("LBS", LBS),
-        ("LAB", LAB),
-        ("MEC", MEC),
-        ("FNPA", FNPA),
-    ]
+    
+    # Validate configuration
+    from src.common_utils import validate_simulation_config
+    validation_errors = validate_simulation_config(config)
+    if validation_errors:
+        print("[ERROR] Configuration validation failed:")
+        for error in validation_errors:
+            print(f"  - {error}")
+        return 1
+    
+    # Use algorithm registry for consistent algorithm access
+    registry = get_registry()
+    algorithm_names = ['LBS', 'LAB', 'MEC', 'FNPA']
+    
+    # Verify all algorithms are available
+    missing_algorithms = [name for name in algorithm_names if not registry.exists(name)]
+    if missing_algorithms:
+        print(f"[ERROR] Missing algorithms: {', '.join(missing_algorithms)}")
+        return 1
 
-    placement_json = create_placement_json("config")
+    placement_json = create_placement_json(str(get_project_root() / "config"))
     
     # Initialize MQTT environment for algorithm comparison
     mqtt_env = MQTTSimulationEnvironment()
     mqtt_env.simulation_time = 0
 
-    for algo_name, AlgoClass in algorithms:
+    for algo_name in algorithm_names:
+        AlgoClass = registry.get(algo_name)
+        if AlgoClass is None:
+            print(f"[ERROR] Algorithm {algo_name} not found in registry")
+            continue
         print(f"\n{'='*70}")
         print(f"Running {algo_name} Algorithm")
         print(f"{'='*70}")
@@ -283,19 +345,39 @@ def run_algorithm_comparison():
             population = Population(name="HealthcareSensors")
 
             placement = AlgoClass(algo_name, placement_json, environment)
+            
+            # Publish simulation start to MQTT
+            mqtt_env.publish_simulation_start({
+                "algorithm": algo_name,
+                "num_sensors": len(environment.sensors),
+                "num_edge_nodes": len(environment.edge_nodes)
+            })
+            
             sim.deploy_app(app, placement, population)
             
-            # Connect MQTT to YAFS simulation for real-time event publishing
+            # Connect MQTT to YAFS simulation and publish placement decisions
             mqtt_env.connect_to_yafs_simulation(sim)
+            mqtt_env.publish_placement_decisions(placement, environment)
             
             sim.run(until=config.simulation_time)
+            
+            # Advance MQTT time
+            mqtt_env.advance_time(config.simulation_time * 1000)
 
             metrics = PerformanceMetrics()
             metrics.collect_metrics(environment, placement, algo_name)
+            
+            # Publish final metrics to MQTT
+            mqtt_env.publish_simulation_end(metrics.get_summary_dict())
+            
+            # Export MQTT log for this algorithm
+            mqtt_log_file = mqtt_env.export_mqtt_log(f"{algo_name.lower()}_mqtt_log.json")
 
             results = {
                 "simulation_config": config.to_dict(),
                 "performance_metrics": metrics.get_summary_dict(),
+                "mqtt_statistics": mqtt_env.get_statistics(),
+                "mqtt_log_file": mqtt_log_file,
                 "simulation_metadata": {
                     "algorithm": algo_name,
                     "framework": "YAFS 1.0",
@@ -303,13 +385,14 @@ def run_algorithm_comparison():
                 },
             }
 
-            results_filename = f"data/{algo_name.lower()}_results.json"
+            results_filename = str(get_project_root() / "data" / f"{algo_name.lower()}_results.json")
             with open(results_filename, "w") as f:
                 json.dump(results, f, indent=2, default=str)
 
-            save_results(metrics, placement, f"reports/{algo_name.lower()}_report.txt")
+            save_results(metrics, placement, str(get_project_root() / "reports" / f"{algo_name.lower()}_report.txt"))
 
             print(f"{algo_name} completed, results saved to {results_filename}")
+            print(f"MQTT log saved to {mqtt_log_file}")
 
         except Exception as e:
             print(f"ERROR running {algo_name}: {e}")
@@ -318,10 +401,6 @@ def run_algorithm_comparison():
     print("\n" + "=" * 80)
     print("ALGORITHM COMPARISON COMPLETED")
     print("=" * 80)
-    
-    # Clear cache to free memory
-    if WORKLOAD_PREDICTOR_AVAILABLE:
-        clear_workload_predictor_cache()
     
     return 0
 
@@ -388,8 +467,8 @@ def run_hospital_comparison():
         print("\n[PHASE 5] Exporting Results")
         print("-" * 80)
         
-        json_file = "data/hospital_comparison_results.json"
-        html_file = "reports/hospital_comparison_report.html"
+        json_file = str(get_project_root() / "data" / "hospital_comparison_results.json")
+        html_file = str(get_project_root() / "reports" / "hospital_comparison_report.html")
         
         runner.export_json(results, json_file)
         runner.export_html(results, html_file)
@@ -399,7 +478,7 @@ def run_hospital_comparison():
         print("\n[PHASE 6] Generating Visualizations")
         print("-" * 80)
         
-        visualizer = HospitalVisualizationEngine(results, "plots")
+        visualizer = HospitalVisualizationEngine(results, str(get_project_root() / "plots"))
         visualizer.generate_all_visualizations()
         
         summary = visualizer.get_performance_summary()
@@ -420,10 +499,6 @@ def run_hospital_comparison():
         print(f"Plots: plots/ directory")
         print("=" * 80)
         
-        # Clear cache to free memory
-        if WORKLOAD_PREDICTOR_AVAILABLE:
-            clear_workload_predictor_cache()
-        
         return 0
         
     except Exception as e:
@@ -431,10 +506,18 @@ def run_hospital_comparison():
         import traceback
         traceback.print_exc()
         return 1
+    finally:
+        # Always clear cache to free memory
+        if WORKLOAD_PREDICTOR_AVAILABLE:
+            clear_workload_predictor_cache()
 
 
 def main():
     """Main entry point with argument parsing"""
+    # Initialize algorithm registry
+    initialize_default_registry()
+    print(f"[INFO] Initialized algorithm registry with {len(get_registry())} algorithms")
+    
     parser = argparse.ArgumentParser(
         description="OLB edge Computing Simulation System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -459,7 +542,8 @@ Examples:
     
     args = parser.parse_args()
     
-    # Setup directories
+    # Setup directories using orchestrator
+    from src.orchestrator import setup_directories
     setup_directories()
     
     # Run appropriate workflow
