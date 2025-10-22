@@ -1,6 +1,7 @@
 import math
 
 from yafs import Placement
+from .common_utils import extract_sensor_id, SensorLookupIndex
 
 
 class OLBLatencyCalculator:
@@ -147,6 +148,7 @@ class OLBPlacement(Placement):
         self.digital_twin = digital_twin
         self.calculator = OLBLatencyCalculator()
         self.module_assignments = {}  # Track which modules are assigned to which nodes
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
 
         # Set activation distribution to None to avoid the error
         self.activation_dist = None
@@ -160,8 +162,8 @@ class OLBPlacement(Placement):
         modules_to_place = [m for m in app.modules if "Processing_Module" in m]
 
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
 
             if sensor:
                 optimal_node_id = self._find_optimal_fog_node(sensor)
@@ -181,21 +183,6 @@ class OLBPlacement(Placement):
                         self.module_assignments[0] = []
                     self.module_assignments[0].append(sensor)
                     self._node_loads[0].append(sensor)
-
-    def _extract_sensor_id(self, module_name):
-        """Extract sensor ID from module name"""
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-
-    def _find_sensor_by_id(self, sensor_id):
-        """Find sensor device by ID"""
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None
 
     def _find_optimal_fog_node(self, sensor):
         min_latency = float("inf")

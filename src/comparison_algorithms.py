@@ -7,6 +7,8 @@ import math
 from typing import Dict, List, Optional, Tuple
 from yafs import Placement
 
+from .common_utils import extract_sensor_id, calculate_euclidean_distance, SensorLookupIndex
+
 
 class LBS(Placement):
     """
@@ -26,22 +28,23 @@ class LBS(Placement):
         self.digital_twin = digital_twin
         self.module_assignments: Dict[int, List] = {}
         self.activation_dist = None
-        
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
+
     def initial_allocation(self, sim, app_name: str):
         """Deploy modules using location-based selection"""
         app = sim.apps[app_name]
         modules_to_place = [m for m in app.modules if "Processing_Module" in m]
-        
+
         print(f"\n{'='*70}")
         print(f"LBS Algorithm: Placing {len(modules_to_place)} modules by location")
         print(f"{'='*70}")
         
         placement_count = 0
         total_distance = 0.0
-        
+
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
             
             if sensor:
                 # Find nearest fog node
@@ -73,35 +76,13 @@ class LBS(Placement):
         nearest_node_id = None
         
         for i, fog_node in enumerate(self.digital_twin.fog_nodes):
-            distance = self._calculate_distance(sensor.coordinates, fog_node.coordinates)
+            distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
             
             if distance < min_distance:
                 min_distance = distance
                 nearest_node_id = i
         
         return nearest_node_id, min_distance
-    
-    def _calculate_distance(self, coord1: Tuple[float, float], 
-                           coord2: Tuple[float, float]) -> float:
-        """Calculate Euclidean distance between two coordinates"""
-        dx = coord1[0] - coord2[0]
-        dy = coord1[1] - coord2[1]
-        return math.sqrt(dx**2 + dy**2)
-    
-    def _extract_sensor_id(self, module_name: str) -> int:
-        """Extract sensor ID from module name"""
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-    
-    def _find_sensor_by_id(self, sensor_id: int):
-        """Find sensor device by ID"""
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None
 
 
 class LAB(Placement):
@@ -123,7 +104,8 @@ class LAB(Placement):
         self.digital_twin = digital_twin
         self.module_assignments: Dict[int, List] = {}
         self.activation_dist = None
-        
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
+
         # Weighting factors
         self.alpha = alpha  # Weight for load consideration
         self.beta = beta    # Weight for distance consideration
@@ -141,18 +123,18 @@ class LAB(Placement):
         """Deploy modules using load-aware balancing"""
         app = sim.apps[app_name]
         modules_to_place = [m for m in app.modules if "Processing_Module" in m]
-        
+
         print(f"\n{'='*70}")
         print(f"LAB Algorithm: Placing {len(modules_to_place)} modules with load awareness")
         print(f"LAB Parameters: α={self.alpha}, β={self.beta}")
         print(f"{'='*70}")
         
         placement_count = 0
-        
+
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
-            
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
+
             if sensor:
                 # Find optimal node based on load and distance
                 optimal_node_id, score = self._find_optimal_node(sensor)
@@ -188,10 +170,10 @@ class LAB(Placement):
         
         # Normalize factors for scoring
         max_distance = self._get_max_distance()
-        
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+
+                for i, fog_node in enumerate(self.digital_twin.fog_nodes):
             # Calculate distance component
-            distance = self._calculate_distance(sensor.coordinates, fog_node.coordinates)
+            distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
             normalized_distance = distance / max_distance if max_distance > 0 else 0
             
             # Calculate load component
@@ -220,13 +202,6 @@ class LAB(Placement):
         height = self.digital_twin.height
         return math.sqrt(width**2 + height**2)
     
-    def _calculate_distance(self, coord1: Tuple[float, float], 
-                           coord2: Tuple[float, float]) -> float:
-        """Calculate Euclidean distance"""
-        dx = coord1[0] - coord2[0]
-        dy = coord1[1] - coord2[1]
-        return math.sqrt(dx**2 + dy**2)
-    
     def _print_load_distribution(self):
         """Print load distribution across nodes"""
         print(f"\n[LAB] Load Distribution:")
@@ -234,21 +209,6 @@ class LAB(Placement):
             utilization = (self.node_loads[i] / self.node_capacities[i] * 100)
             assignments = len(self.module_assignments.get(i, []))
             print(f"  fog_{i}: {assignments} sensors, {utilization:.1f}% utilized")
-    
-    def _extract_sensor_id(self, module_name: str) -> int:
-        """Extract sensor ID from module name"""
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-    
-    def _find_sensor_by_id(self, sensor_id: int):
-        """Find sensor device by ID"""
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None
 
 
 class MEC(Placement):
@@ -270,6 +230,7 @@ class MEC(Placement):
         self.digital_twin = digital_twin
         self.module_assignments: Dict[int, List] = {}
         self.activation_dist = None
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
         
         # Multi-objective weights
         self.latency_weight = latency_weight
@@ -287,7 +248,7 @@ class MEC(Placement):
         """Deploy modules using multi-edge coordination"""
         app = sim.apps[app_name]
         modules_to_place = [m for m in app.modules if "Processing_Module" in m]
-        
+
         print(f"\n{'='*70}")
         print(f"MEC Algorithm: Placing {len(modules_to_place)} modules with coordination")
         print(f"MEC Weights: latency={self.latency_weight}, energy={self.energy_weight}")
@@ -295,19 +256,19 @@ class MEC(Placement):
         
         placement_count = 0
         total_energy = 0.0
-        
+
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
-            
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
+
             if sensor:
                 # Find optimal node considering latency and energy
                 optimal_node_id, latency_cost, energy_cost = self._find_optimal_edge(sensor)
-                
+
                 if optimal_node_id is not None:
                     node_name = f"fog_{optimal_node_id}"
-                    sim.deploy_module(app_name, module_name, [], [node_name])
-                    
+                sim.deploy_module(app_name, module_name, [], [node_name])
+
                     # Track assignment
                     if optimal_node_id not in self.module_assignments:
                         self.module_assignments[optimal_node_id] = []
@@ -362,7 +323,7 @@ class MEC(Placement):
     def _estimate_latency(self, sensor, fog_node, node_id: int) -> float:
         """Estimate latency for assignment"""
         # Distance-based communication latency
-        distance = self._calculate_distance(sensor.coordinates, fog_node.coordinates)
+        distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
         comm_latency = distance / 1000.0  # Simple model: 1ms per km
         
         # Load-based computation latency
@@ -375,7 +336,7 @@ class MEC(Placement):
     def _estimate_energy(self, sensor, fog_node, node_id: int) -> float:
         """Estimate energy consumption for assignment"""
         # Distance-based transmission energy
-        distance = self._calculate_distance(sensor.coordinates, fog_node.coordinates)
+        distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
         transmission_energy = sensor.transmissionPower * (distance / 1000.0) * 0.001
         
         # Computation energy (based on workload)
@@ -387,13 +348,6 @@ class MEC(Placement):
         
         return (transmission_energy + computation_energy) * load_factor
     
-    def _calculate_distance(self, coord1: Tuple[float, float], 
-                           coord2: Tuple[float, float]) -> float:
-        """Calculate Euclidean distance"""
-        dx = coord1[0] - coord2[0]
-        dy = coord1[1] - coord2[1]
-        return math.sqrt(dx**2 + dy**2)
-    
     def _print_edge_coordination_status(self):
         """Print coordination status across edges"""
         print(f"\n[MEC] Edge Coordination Status:")
@@ -402,21 +356,6 @@ class MEC(Placement):
             energy = self.node_energy_consumption[i]
             assignments = len(self.module_assignments.get(i, []))
             print(f"  fog_{i}: {assignments} sensors, load={load:.1f}, energy={energy:.2f}J")
-    
-    def _extract_sensor_id(self, module_name: str) -> int:
-        """Extract sensor ID from module name"""
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-    
-    def _find_sensor_by_id(self, sensor_id: int):
-        """Find sensor device by ID"""
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None
 
 
 class FNPA(Placement):
@@ -440,6 +379,7 @@ class FNPA(Placement):
         self.digital_twin = digital_twin
         self.module_assignments: Dict[int, List] = {}
         self.activation_dist = None
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
         
         # Resource management thresholds
         self.resource_threshold = resource_threshold  # Max 85% utilization
@@ -472,11 +412,11 @@ class FNPA(Placement):
         placement_count = 0
         fog_count = 0
         cloud_count = 0
-        
+
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
-            
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
+
             if sensor:
                 # Try to find suitable fog node
                 optimal_node_id = self._find_suitable_fog_node(sensor)
@@ -504,7 +444,7 @@ class FNPA(Placement):
                     
                     print(f"  [FNPA] Sensor {sensor_id} -> fog_{optimal_node_id} "
                           f"(util: {utilization:.1f}%)")
-                else:
+            else:
                     # Fallback to cloud
                     node_name = "cloud"
                     sim.deploy_module(app_name, module_name, [], [node_name])
@@ -524,7 +464,7 @@ class FNPA(Placement):
         """Find nearest fog node with available resources"""
         # Create list of (distance, node_id) pairs
         candidates = []
-        
+
         for i, fog_node in enumerate(self.digital_twin.fog_nodes):
             # Check resource availability
             utilization = self.node_loads[i] / self.node_capacities[i]
@@ -537,7 +477,7 @@ class FNPA(Placement):
                 continue
             
             # Calculate distance (hop distance approximated by Euclidean distance)
-            distance = self._calculate_distance(sensor.coordinates, fog_node.coordinates)
+            distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
             
             candidates.append((distance, i))
         
@@ -548,13 +488,6 @@ class FNPA(Placement):
         # Sort by distance and select nearest
         candidates.sort(key=lambda x: x[0])
         return candidates[0][1]
-    
-    def _calculate_distance(self, coord1: Tuple[float, float], 
-                           coord2: Tuple[float, float]) -> float:
-        """Calculate Euclidean distance (approximates hop distance)"""
-        dx = coord1[0] - coord2[0]
-        dy = coord1[1] - coord2[1]
-        return math.sqrt(dx**2 + dy**2)
     
     def _print_resource_status(self):
         """Print resource utilization status"""
@@ -568,18 +501,3 @@ class FNPA(Placement):
                   f"BW={bandwidth_util:.1f}% [{status}]")
         if self.cloud_assignments > 0:
             print(f"  cloud: {self.cloud_assignments} sensors (fallback)")
-    
-    def _extract_sensor_id(self, module_name: str) -> int:
-        """Extract sensor ID from module name"""
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-    
-    def _find_sensor_by_id(self, sensor_id: int):
-        """Find sensor device by ID"""
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None

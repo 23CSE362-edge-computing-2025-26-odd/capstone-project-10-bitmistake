@@ -1,7 +1,13 @@
 import math
 from yafs import Placement
 from .olb_algorithm import OLBLatencyCalculator
-from .workload_models import WorkloadPredictor
+from .common_utils import extract_sensor_id, SensorLookupIndex
+
+# Import from CI_Models/Workload for edge deployment
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'CI_Models', 'Workload'))
+from tflite_predictor import EdgeWorkloadPredictor as WorkloadPredictor
 
 
 class PredictiveLatencyPlacement(Placement):
@@ -9,7 +15,11 @@ class PredictiveLatencyPlacement(Placement):
         super().__init__(name, json_file)
         self.digital_twin = digital_twin
         self.calculator = OLBLatencyCalculator()
-        self.workload_predictor = WorkloadPredictor(history_window=50, prediction_horizon=prediction_horizon)
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
+        self.workload_predictor = WorkloadPredictor(
+            model_dir=os.path.join(os.path.dirname(__file__), '..', 'CI_Models', 'Workload', 'models'),
+            use_tflite=True
+        )
         self.module_assignments = {}
         self.activation_dist = None
         self.prediction_horizon = prediction_horizon
@@ -22,8 +32,8 @@ class PredictiveLatencyPlacement(Placement):
         print(f"\n[PredictiveLatency] Placing {len(modules_to_place)} modules with workload forecasting...")
 
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
 
             if sensor:
                 self._record_current_loads()
@@ -94,26 +104,13 @@ class PredictiveLatencyPlacement(Placement):
 
         return optimal_node_id
 
-    def _extract_sensor_id(self, module_name):
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-
-    def _find_sensor_by_id(self, sensor_id):
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None
-
-
 
 class ForecastBasedPlacement(Placement):
     def __init__(self, name, json_file, digital_twin, workload_forecaster):
         super().__init__(name, json_file)
         self.digital_twin = digital_twin
         self.calculator = OLBLatencyCalculator()
+        self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
         self.workload_forecaster = workload_forecaster
         self.module_assignments = {}
         self.activation_dist = None
@@ -131,8 +128,8 @@ class ForecastBasedPlacement(Placement):
         print(f"  Forecasted avg load multiplier: {avg_future_load:.2f}")
 
         for module_name in modules_to_place:
-            sensor_id = self._extract_sensor_id(module_name)
-            sensor = self._find_sensor_by_id(sensor_id)
+            sensor_id = extract_sensor_id(module_name)
+            sensor = self.sensor_lookup.find_by_id(sensor_id)
 
             if sensor:
                 optimal_node_id = self._find_forecast_optimal_node(sensor, avg_future_load)
@@ -182,16 +179,3 @@ class ForecastBasedPlacement(Placement):
         sensor.averageFlowRate = original_flow_rate
 
         return optimal_node_id
-
-    def _extract_sensor_id(self, module_name):
-        parts = module_name.split("_")
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
-        return 0
-
-    def _find_sensor_by_id(self, sensor_id):
-        for sensor in self.digital_twin.sensors:
-            if sensor.device_id == sensor_id:
-                return sensor
-        return None
