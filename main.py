@@ -4,16 +4,33 @@ import os
 import sys
 from datetime import datetime
 
-from src.comparison_algorithms import (DistancePlacement, FNPAPlacement,
-                                       LoadBalancedPlacement, RandomPlacement)
-
+# --- PATH SETUP ---
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "CI_Models"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "Workload"))
 
-from src import (DigitalTwinEnvironment, OLBPlacement, PerformanceMetrics,
-                 SimulationConfig, create_placement_json,
-                 create_smart_healthcare_application, create_yafs_topology,
-                 save_results)
+# --- SRC IMPORTS ---
+from src.comparison_algorithms import (
+    DistancePlacement,
+    FNPAPlacement,
+    LoadBalancedPlacement,
+    RandomPlacement,
+)
+from src import (
+    DigitalTwinEnvironment,
+    OLBPlacement,
+    PerformanceMetrics,
+    SimulationConfig,
+    create_placement_json,
+    create_smart_healthcare_application,
+    create_yafs_topology,
+    save_results,
+)
 
+# --- CI MODEL IMPORT ---
+from Workload.predict import WorkloadPredictor
+
+# --- ALGORITHMS FOR EXPERIMENT COMPARISON ---
 algorithms = [
     ("RandomPlacement", RandomPlacement),
     ("DistancePlacement", DistancePlacement),
@@ -21,11 +38,11 @@ algorithms = [
     ("FNPAPlacement", FNPAPlacement),
 ]
 
-# Configure logging
+# --- LOGGING CONFIGURATION ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("logs/olb_simulation.log")],
+    handlers=[logging.FileHandler("logs/olb_simulation.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -35,6 +52,7 @@ def main():
 
     config = SimulationConfig()
 
+    # --- CREATE DIGITAL TWIN ENVIRONMENT ---
     logger.info("Creating digital twin environment...")
     environment = DigitalTwinEnvironment(
         width=config.environment_width, height=config.environment_height
@@ -46,6 +64,36 @@ def main():
         num_fog_nodes=config.num_fog_nodes, seed=config.random_seed
     )
 
+    # --- CI MODEL INTEGRATION (Workload Predictor) ---
+    logger.info("Running CI Model (LSTM Workload Predictor)...")
+    ci_model = WorkloadPredictor(model_dir="CI_Models/Workload/models")
+    workload_predictions = {}
+
+    for i, fog_node in enumerate(environment.fog_nodes):
+        node_name = f"system-{i+1}"
+        try:
+            result = ci_model.predict_future(
+                node_name, future_steps=200, plot=False, save_plot=False
+            )
+            workload_predictions[node_name] = result["stats"]
+            logger.info(f"Predicted workload for {node_name}: {result['stats']}")
+        except Exception as e:
+            logger.warning(f"Workload prediction failed for {node_name}: {e}")
+
+    # --- ADJUST FOG NODE CAPACITIES BASED ON PREDICTED WORKLOAD ---
+    logger.info("Adjusting fog node capacities based on predicted workloads...")
+    for i, fog_node in enumerate(environment.fog_nodes):
+        node_name = f"system-{i+1}"
+        if node_name in workload_predictions:
+            predicted_load = workload_predictions[node_name]["predicted_avg"]
+            adjustment_factor = max(0.5, 1.0 - (predicted_load / 100.0))
+            fog_node.processingPower *= adjustment_factor
+            logger.info(
+                f"FogNode {i} adjusted: Power={fog_node.processingPower:.2f}, "
+                f"AdjFactor={adjustment_factor:.2f}"
+            )
+
+    # --- SETUP YAFS APPLICATION AND TOPOLOGY ---
     logger.info("Setting up YAFS application and topology...")
     app = create_smart_healthcare_application(environment)
     topology = create_yafs_topology(environment)
@@ -73,8 +121,10 @@ def main():
         metrics = PerformanceMetrics()
         metrics.collect_metrics(environment, olb_placement, "OLB")
 
+        # --- INCLUDE CI MODEL RESULTS IN OUTPUT ---
         results = {
             "simulation_config": config.to_dict(),
+            "ci_predictions": workload_predictions,  # ← Added CI data
             "environment_info": {
                 "num_sensors": len(environment.sensors),
                 "num_fog_nodes": len(environment.fog_nodes),
@@ -113,14 +163,12 @@ def main():
 
 def run_experiments(placement_json, config):
     import json
-
     from yafs.core import Sim
     from yafs.population import Population
 
     for algo_name, AlgoClass in algorithms:
         print(f"\n==== Running {algo_name} ====\n")
 
-        # Fresh environment for each run
         environment = DigitalTwinEnvironment(
             width=config.environment_width, height=config.environment_height
         )
@@ -163,17 +211,15 @@ def run_experiments(placement_json, config):
 
 
 if __name__ == "__main__":
-    # Create directories if they don't exist
+    # --- CREATE DIRECTORIES ---
     os.makedirs("results", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     os.makedirs("reports", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
 
-    # Run main simulation
-    # Run main simulation (OLB)
+    # --- RUN MAIN SIMULATION ---
     sim, app_name, placement_json, environment, results = main()
 
-    # Step 4: Run all comparison algorithms
+    # --- RUN COMPARISON EXPERIMENTS ---
     config = SimulationConfig()
-
     run_experiments(placement_json, config)

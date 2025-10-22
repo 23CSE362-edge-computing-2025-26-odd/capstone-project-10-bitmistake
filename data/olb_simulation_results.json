@@ -17,6 +17,26 @@
       "results_file": "yafs_olb_results.txt"
     }
   },
+  "ci_predictions": {
+    "system-1": {
+      "current_avg": 0.2298,
+      "predicted_avg": 0.26110859390124674,
+      "predicted_max": 0.2671159361302853,
+      "predicted_min": 0.14800410762429236
+    },
+    "system-3": {
+      "current_avg": 0.1448,
+      "predicted_avg": 0.10027829051408918,
+      "predicted_max": 0.1024466035887599,
+      "predicted_min": 0.06587387640029192
+    },
+    "system-4": {
+      "current_avg": 0.133,
+      "predicted_avg": 0.13495103827454147,
+      "predicted_max": 0.13528177089989185,
+      "predicted_min": 0.1291885419934988
+    }
+  },
   "environment_info": {
     "num_sensors": 10,
     "num_fog_nodes": 6,
@@ -91,13 +111,13 @@
   },
   "performance_metrics": {
     "algorithm": "OLB",
-    "overall_latency": 5.922304036206112,
+    "overall_latency": 5.933564192555339,
     "communication_latency": 0.2505203598622118,
-    "computing_latency": 5.6717836763439005,
+    "computing_latency": 5.683043832693127,
     "network_usage": 5.075971518852187,
-    "execution_time": 0.5922304036206112,
+    "execution_time": 0.593356419255534,
     "energy_consumption": 60.472464374279454,
-    "cost_of_execution": 2.0554782670488096,
+    "cost_of_execution": 2.0566042826837325,
     "load_balance_score": 0.6428571428571428,
     "max_utilization": 3,
     "num_assignments": 10,
@@ -140,8 +160,8 @@
         "sensor_id": 1,
         "fog_node_id": 3,
         "comm_latency": 0.042432698887489406,
-        "comp_latency": 0.7703599793932258,
-        "total_latency": 0.8127926782807151,
+        "comp_latency": 0.7722048688511819,
+        "total_latency": 0.8146375677386712,
         "energy": 6.852123476168695,
         "distance": 1775.9818403504953,
         "sensor_coordinates": [
@@ -157,8 +177,8 @@
         "sensor_id": 2,
         "fog_node_id": 3,
         "comm_latency": 0.037635235957728795,
-        "comp_latency": 0.7703599793932258,
-        "total_latency": 0.8079952153509545,
+        "comp_latency": 0.7722048688511819,
+        "total_latency": 0.8098401048089107,
         "energy": 9.836055061136266,
         "distance": 1454.3501975412446,
         "sensor_coordinates": [
@@ -174,8 +194,8 @@
         "sensor_id": 9,
         "fog_node_id": 3,
         "comm_latency": 0.03288578832345802,
-        "comp_latency": 0.7703599793932258,
-        "total_latency": 0.8032457677166838,
+        "comp_latency": 0.7722048688511819,
+        "total_latency": 0.8050906571746399,
         "energy": 3.020542988294037,
         "distance": 683.8778632179984,
         "sensor_coordinates": [
@@ -191,8 +211,8 @@
         "sensor_id": 3,
         "fog_node_id": 0,
         "comm_latency": 0.013491884605900856,
-        "comp_latency": 0.629611385581122,
-        "total_latency": 0.6431032701870228,
+        "comp_latency": 0.6323018650305081,
+        "total_latency": 0.645793749636409,
         "energy": 6.237689814743351,
         "distance": 1394.6779310107217,
         "sensor_coordinates": [
@@ -208,8 +228,8 @@
         "sensor_id": 8,
         "fog_node_id": 0,
         "comm_latency": 0.00849466495352341,
-        "comp_latency": 0.629611385581122,
-        "total_latency": 0.6381060505346453,
+        "comp_latency": 0.6323018650305081,
+        "total_latency": 0.6407965299840315,
         "energy": 2.7426197383980195,
         "distance": 520.7907155867358,
         "sensor_coordinates": [
@@ -259,8 +279,8 @@
         "sensor_id": 7,
         "fog_node_id": 2,
         "comm_latency": 0.003039143914587597,
-        "comp_latency": 0.2701528037327777,
-        "total_latency": 0.2731919476473653,
+        "comp_latency": 0.2704973328093645,
+        "total_latency": 0.2735364767239521,
         "energy": 0.8556368051134017,
         "distance": 506.9812033516769,
         "sensor_coordinates": [
