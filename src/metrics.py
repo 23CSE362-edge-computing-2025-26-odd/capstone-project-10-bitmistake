@@ -92,6 +92,13 @@ class PerformanceMetrics:
         self.load_balance_score = 0
         self.max_utilization = 0
         self.algorithm_name = "Unknown"
+        # Statistical latency metrics
+        self.latency_min = 0
+        self.latency_max = 0
+        self.latency_p99 = 0
+        # Resource utilization metrics
+        self.cpu_utilization = 0
+        self.memory_utilization = 0
 
         print("[DEBUG] MetricsCollector initialized")
 
@@ -185,6 +192,28 @@ class PerformanceMetrics:
             + self.network_usage * 0.05
             + self.energy_consumption * 0.02
         )
+        
+        # Calculate statistical latency metrics
+        if self.detailed_assignments:
+            latencies = [a["total_latency"] for a in self.detailed_assignments]
+            self.latency_min = min(latencies)
+            self.latency_max = max(latencies)
+            # Calculate 99th percentile
+            sorted_latencies = sorted(latencies)
+            p99_index = int(len(sorted_latencies) * 0.99)
+            self.latency_p99 = sorted_latencies[p99_index] if p99_index < len(sorted_latencies) else sorted_latencies[-1]
+        
+        # Calculate CPU and memory utilization
+        if digital_twin.fog_nodes:
+            total_capacity = sum(fog.processingPower for fog in digital_twin.fog_nodes)
+            total_load = sum(
+                len(sensors) * sum(s.averageFlowSize for s in sensors) 
+                for sensors in placement.module_assignments.values()
+            )
+            self.cpu_utilization = min(100.0, (total_load / total_capacity * 100)) if total_capacity > 0 else 0
+            # Memory utilization estimate (based on number of assignments)
+            total_assignments = sum(len(sensors) for sensors in placement.module_assignments.values())
+            self.memory_utilization = min(100.0, (total_assignments / len(digital_twin.sensors) * 80)) if digital_twin.sensors else 0
 
     def generate_report(self):
         """Generate comprehensive performance report"""
@@ -234,12 +263,17 @@ DETAILED ASSIGNMENT ANALYSIS:
             "overall_latency": self.overall_latency,
             "communication_latency": self.communication_latency,
             "computing_latency": self.computing_latency,
+            "latency_min": self.latency_min,
+            "latency_max": self.latency_max,
+            "latency_p99": self.latency_p99,
             "network_usage": self.network_usage,
             "execution_time": self.execution_time,
             "energy_consumption": self.energy_consumption,
             "cost_of_execution": self.cost_of_execution,
             "load_balance_score": self.load_balance_score,
             "max_utilization": self.max_utilization,
+            "cpu_utilization": self.cpu_utilization,
+            "memory_utilization": self.memory_utilization,
             "num_assignments": len(self.detailed_assignments),
             "detailed_assignments": self.detailed_assignments,
         }
