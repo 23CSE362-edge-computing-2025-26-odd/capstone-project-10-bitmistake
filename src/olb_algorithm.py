@@ -1,7 +1,7 @@
 import math
 
 from yafs import Placement
-from .common_utils import extract_sensor_id, SensorLookupIndex
+from .common_utils import extract_sensor_id, SensorLookupIndex, calculate_euclidean_distance
 
 
 class OLBLatencyCalculator:
@@ -14,10 +14,11 @@ class OLBLatencyCalculator:
         self.speed_of_light = 299792458  # m/s
 
     def calculate_distance(self, sensor_coords, fog_coords):
-        """Calculate Euclidean distance between sensor and fog node"""
-        dx = sensor_coords[0] - fog_coords[0]
-        dy = sensor_coords[1] - fog_coords[1]
-        return math.sqrt(dx**2 + dy**2)
+        """
+        Calculate Euclidean distance between sensor and fog node.
+        Uses common_utils implementation to avoid duplication.
+        """
+        return calculate_euclidean_distance(sensor_coords, fog_coords)
 
     def calculate_channel_gain(self, distance, carrier_frequency):
         """Calculate Channel Gain (g(x))"""
