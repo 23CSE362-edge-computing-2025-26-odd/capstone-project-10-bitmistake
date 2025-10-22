@@ -1,13 +1,27 @@
 import math
+import sys
+import os
 from yafs import Placement
 from .olb_algorithm import OLBLatencyCalculator
 from .common_utils import extract_sensor_id, SensorLookupIndex
 
-# Import from CI_Models/Workload for edge deployment
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'CI_Models', 'Workload'))
-from tflite_predictor import EdgeWorkloadPredictor as WorkloadPredictor
+# Import from CI_Models/Workload for edge deployment with proper error handling
+try:
+    # Add to path only if not already present
+    workload_path = os.path.join(os.path.dirname(__file__), '..', 'CI_Models', 'Workload')
+    workload_path = os.path.abspath(workload_path)
+    if workload_path not in sys.path:
+        sys.path.insert(0, workload_path)
+    
+    from tflite_predictor import EdgeWorkloadPredictor as WorkloadPredictor
+    WORKLOAD_PREDICTOR_AVAILABLE = True
+except (ImportError, ModuleNotFoundError) as e:
+    print(f"Warning: WorkloadPredictor not available: {e}")
+    WORKLOAD_PREDICTOR_AVAILABLE = False
+    # Create stub class
+    class WorkloadPredictor:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("WorkloadPredictor not available")
 
 
 class PredictiveLatencyPlacement(Placement):
