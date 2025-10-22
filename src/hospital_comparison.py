@@ -1,10 +1,10 @@
 import json
 import time
 import statistics
+import os
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
-
 try:
     from . import PREDICTIVE_AVAILABLE
 except ImportError:
@@ -81,9 +81,22 @@ class HospitalComparisonRunner:
         # Base algorithms always available
         self.algorithms = ["OLB", "LBS", "LAB", "MEC", "FNPA"]
         
-        # Add Predictive only if available
+        # Add Predictive only if available AND properly configured
         if PREDICTIVE_AVAILABLE:
-            self.algorithms.append("Predictive")
+            try:
+                # Test if Predictive can actually be instantiated
+                from .predictive_placement import PredictiveLatencyPlacement
+                # Check if TFLite models exist
+                import os
+                model_dir = os.path.join(os.path.dirname(__file__), '..', 'CI_Models', 'Workload', 'models')
+                if os.path.exists(model_dir) and os.listdir(model_dir):
+                    self.algorithms.append("Predictive")
+                    print("[INFO] Predictive algorithm enabled with LSTM models")
+                else:
+                    print("[WARNING] Predictive algorithm disabled - LSTM models not found")
+                    print(f"[INFO] Expected model directory: {model_dir}")
+            except Exception as e:
+                print(f"[WARNING] Predictive algorithm disabled - initialization failed: {e}")
         else:
             print("[INFO] Predictive algorithm unavailable - skipping from comparison")
         
@@ -142,10 +155,16 @@ class HospitalComparisonRunner:
                             self.metrics.append(metric)
                             print(f"  [OK] Iteration {iteration + 1}/{self.iterations} "
                                   f"(latency: {metric.latency_avg:.2f}ms, "
-                                  f"energy: {metric.energy_consumption:.2f}J)")
+                                  f"energy: {metric.energy_consumption:.2f}J, "
+                                  f"load_balance: {metric.load_balance_score:.3f})")
                             total_runs += 1
                         else:
-                            print(f"  [FAIL] Iteration {iteration + 1}/{self.iterations} failed")
+                            print(f"  [FAIL] Iteration {iteration + 1}/{self.iterations} returned None")
+                            print(f"  [INFO] Check if algorithm {algorithm} is properly implemented")
+                    except ValueError as e:
+                        # Catch placement failures specifically
+                        print(f"  [ERROR] Iteration {iteration + 1}/{self.iterations} - Placement failed: {e}")
+                        print(f"  [INFO] Algorithm {algorithm} may not be compatible with scenario {scenario_name}")
                     except Exception as e:
                         print(f"  [ERROR] Iteration {iteration + 1}/{self.iterations} crashed: {e}")
                         import traceback
@@ -160,7 +179,38 @@ class HospitalComparisonRunner:
         print(f"Total successful runs: {total_runs}")
         print("=" * 70)
         
+        # Print summary statistics
+        self._print_comparison_summary()
+        
         return self._create_results(duration, total_runs)
+    
+    def _print_comparison_summary(self):
+        """Print detailed comparison summary"""
+        print("\n" + "=" * 70)
+        print("COMPARISON SUMMARY")
+        print("=" * 70)
+        
+        for scenario in self.scenarios:
+            scenario_metrics = [m for m in self.metrics if m.scenario_name == scenario]
+            if not scenario_metrics:
+                print(f"\n{scenario}: NO DATA")
+                continue
+            
+            print(f"\n{scenario}:")
+            print(f"{'Algorithm':<15} {'Latency (ms)':<15} {'Energy (J)':<15} {'Load Balance':<15}")
+            print("-" * 70)
+            
+            for algorithm in self.algorithms:
+                algo_metrics = [m for m in scenario_metrics if m.algorithm_name == algorithm]
+                if algo_metrics:
+                    avg_latency = statistics.mean([m.latency_avg for m in algo_metrics])
+                    avg_energy = statistics.mean([m.energy_consumption for m in algo_metrics])
+                    avg_load = statistics.mean([m.load_balance_score for m in algo_metrics])
+                    print(f"{algorithm:<15} {avg_latency:<15.2f} {avg_energy:<15.2f} {avg_load:<15.3f}")
+                else:
+                    print(f"{algorithm:<15} {'NO DATA':<15} {'NO DATA':<15} {'NO DATA':<15}")
+        
+        print("\n" + "=" * 70)
     
     def _run_real_simulation(
         self, 
@@ -216,17 +266,37 @@ class HospitalComparisonRunner:
                 summary = metrics_collector.get_summary_dict()
                 
                 # 7. Create MetricPoint from real data
+                # Extract per-task latencies for proper averaging
+                per_task_latencies = summary.get("per_task_latencies", [])
+                
+                if per_task_latencies:
+                    # Use actual per-task latencies for accurate metrics
+                    import statistics
+                    avg_latency = statistics.mean(per_task_latencies)
+                    min_latency = min(per_task_latencies)
+                    max_latency = max(per_task_latencies)
+                    sorted_latencies = sorted(per_task_latencies)
+                    p99_index = int(len(sorted_latencies) * 0.99)
+                    p99_latency = sorted_latencies[p99_index] if p99_index < len(sorted_latencies) else sorted_latencies[-1]
+                else:
+                    # Fallback to summary metrics if per-task data unavailable
+                    num_assignments = summary.get("num_assignments", 1)
+                    avg_latency = summary.get("overall_latency", 0.0) / max(num_assignments, 1)
+                    min_latency = summary.get("latency_min", 0.0)
+                    max_latency = summary.get("latency_max", 0.0)
+                    p99_latency = summary.get("latency_p99", max_latency)
+                
                 metric = MetricPoint(
                     algorithm_name=algorithm_name,
                     scenario_name=scenario.name,
                     iteration=iteration,
-                    latency_min=summary.get("latency_min", 0.0),
-                    latency_max=summary.get("latency_max", 0.0),
-                    latency_avg=summary.get("overall_latency", 0.0),
-                    latency_p99=summary.get("latency_p99", summary.get("overall_latency", 0.0) * 1.1),
+                    latency_min=min_latency,
+                    latency_max=max_latency,
+                    latency_avg=avg_latency,  # Use true average per task
+                    latency_p99=p99_latency,
                     energy_consumption=summary.get("energy_consumption", 0.0),
                     load_balance_score=summary.get("load_balance_score", 0.0),
-                    sla_compliance_percent=summary.get("sla_compliance", 100.0),
+                    sla_compliance_percent=summary.get("sla_compliance_percent", 100.0),
                     placement_time_ms=placement_time,
                     network_bandwidth_mbps=summary.get("network_usage", 0.0),
                     cpu_utilization_percent=summary.get("cpu_utilization", 0.0),
@@ -274,6 +344,24 @@ class HospitalComparisonRunner:
         """Create results structure"""
         scenarios_data = []
         
+        # Debug: Log all collected metrics
+        print("\n" + "=" * 70)
+        print("DEBUG: Collected Metrics Summary")
+        print("=" * 70)
+        for metric in self.metrics:
+            print(f"  {metric.algorithm_name:15} | {metric.scenario_name:25} | "
+                  f"Iter {metric.iteration} | Latency: {metric.latency_avg:8.2f}ms")
+        
+        # Debug: Count metrics by algorithm
+        algo_counts = {}
+        for metric in self.metrics:
+            algo_counts[metric.algorithm_name] = algo_counts.get(metric.algorithm_name, 0) + 1
+        print("\nMetrics per Algorithm:")
+        for algo in self.algorithms:
+            count = algo_counts.get(algo, 0)
+            print(f"  {algo}: {count} metrics")
+        print("=" * 70 + "\n")
+        
         for scenario in self.scenarios:
             scenario_metrics = [m for m in self.metrics if m.scenario_name == scenario]
             scenario_results = []
@@ -300,6 +388,8 @@ class HospitalComparisonRunner:
                         "cpu_utilization_percent": statistics.mean([m.cpu_utilization_percent for m in algo_metrics]),
                         "memory_utilization_percent": statistics.mean([m.memory_utilization_percent for m in algo_metrics])
                     })
+                else:
+                    print(f"[WARNING] No metrics found for {algorithm} in {scenario}")
             
             scenarios_data.append({
                 "scenario_name": scenario,

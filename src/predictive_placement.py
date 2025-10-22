@@ -64,12 +64,14 @@ class PredictiveLatencyPlacement(Placement):
                     
                     print(f"  Sensor {sensor_id} -> edge {optimal_node_id} (predictive)")
                 else:
-                    fallback_node = "edge_0"
+                    # Improved fallback: Use load-aware strategy instead of always edge_0
+                    fallback_node_id = self._find_least_loaded_node()
+                    fallback_node = f"edge_{fallback_node_id}"
                     sim.deploy_module(app_name, module_name, [], [fallback_node])
-                    if 0 not in self.module_assignments:
-                        self.module_assignments[0] = []
-                    self.module_assignments[0].append(sensor)
-                    print(f"  Sensor {sensor_id} -> edge 0 (fallback)")
+                    if fallback_node_id not in self.module_assignments:
+                        self.module_assignments[fallback_node_id] = []
+                    self.module_assignments[fallback_node_id].append(sensor)
+                    print(f"  Sensor {sensor_id} -> edge {fallback_node_id} (fallback - least loaded)")
 
     def _record_current_loads(self):
         for sensor in self.digital_twin.sensors:
@@ -118,6 +120,22 @@ class PredictiveLatencyPlacement(Placement):
 
         return optimal_node_id
 
+    def _find_least_loaded_node(self):
+        """Find the currently least-loaded edge node to use as fallback"""
+        min_load = float("inf")
+        least_loaded_node_id = 0
+        
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
+            assigned_sensors = self.module_assignments.get(i, [])
+            # Calculate current load as sum of assigned sensors' flow rates
+            current_load = sum(s.averageFlowRate for s in assigned_sensors)
+            
+            if current_load < min_load:
+                min_load = current_load
+                least_loaded_node_id = i
+        
+        return least_loaded_node_id
+
 
 class ForecastBasedPlacement(Placement):
     def __init__(self, name, json_file, digital_twin, workload_forecaster):
@@ -158,11 +176,14 @@ class ForecastBasedPlacement(Placement):
                     
                     print(f"  Sensor {sensor_id} -> edge {optimal_node_id}")
                 else:
-                    fallback_node = "edge_0"
+                    # Improved fallback: Use load-aware strategy instead of always edge_0
+                    fallback_node_id = self._find_least_loaded_node()
+                    fallback_node = f"edge_{fallback_node_id}"
                     sim.deploy_module(app_name, module_name, [], [fallback_node])
-                    if 0 not in self.module_assignments:
-                        self.module_assignments[0] = []
-                    self.module_assignments[0].append(sensor)
+                    if fallback_node_id not in self.module_assignments:
+                        self.module_assignments[fallback_node_id] = []
+                    self.module_assignments[fallback_node_id].append(sensor)
+                    print(f"  Sensor {sensor_id} -> edge {fallback_node_id} (fallback - least loaded)")
 
     def _find_forecast_optimal_node(self, sensor, future_load_multiplier):
         min_latency = float("inf")

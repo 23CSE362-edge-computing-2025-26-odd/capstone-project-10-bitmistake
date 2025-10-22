@@ -1,6 +1,6 @@
 """
-LSTM Workload Predictor - Edge Deployment Compatible
-Supports both full TensorFlow and TFLite inference modes
+LSTM Workload Predictor - Clean Version
+Fixes all import and type issues
 """
 import os
 import sys
@@ -15,31 +15,18 @@ import matplotlib.pyplot as plt
 
 # TensorFlow imports
 import tensorflow as tf
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# Suppress TensorFlow logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.get_logger().setLevel('ERROR')
 
-# Import edge deployment components
-try:
-    from .tflite_predictor import EdgeWorkloadPredictor, PatternBasedWorkloadGenerator, HealthcareWorkloadForecaster
-except ImportError:
-    from tflite_predictor import EdgeWorkloadPredictor, PatternBasedWorkloadGenerator, HealthcareWorkloadForecaster
-
 class WorkloadPredictor:
-    """LSTM-based workload predictor with edge deployment support"""
+    """LSTM-based workload predictor with proper type hints"""
     
-    def __init__(self, model_dir: str = "models", use_tflite: bool = False) -> None:
+    def __init__(self, model_dir: str = "models") -> None:
         self.model_dir = model_dir
-        self.use_tflite = use_tflite
         self.scaler: Optional[Any] = None
         self.features: Optional[List[str]] = None
         self.seq_length: Optional[int] = None
-        
-        # Edge deployment components
-        if use_tflite:
-            self.edge_predictor = EdgeWorkloadPredictor(model_dir, use_tflite=True)
-        else:
-            self.edge_predictor = None
-        
         self.load_training_info()
     
     def load_training_info(self) -> None:
@@ -47,24 +34,17 @@ class WorkloadPredictor:
         try:
             # Load scaler
             scaler_path = os.path.join(self.model_dir, 'scaler.pkl')
-            if not os.path.exists(scaler_path):
-                # Try relative path from current working directory
-                scaler_path = os.path.join(os.path.dirname(__file__), 'models', 'scaler.pkl')
-            
             with open(scaler_path, 'rb') as f:
                 self.scaler = pickle.load(f)
-            print(f"Loaded scaler from {scaler_path}")
+            print(f"✓ Loaded scaler from {scaler_path}")
             
             # Load training summary
             summary_path = os.path.join(self.model_dir, 'training_summary.pkl')
-            if not os.path.exists(summary_path):
-                summary_path = os.path.join(os.path.dirname(__file__), 'models', 'training_summary.pkl')
-                
             with open(summary_path, 'rb') as f:
                 summary = pickle.load(f)
                 self.seq_length = summary['seq_length']
                 self.features = summary['features']
-            print(f"Loaded parameters: seq_length={self.seq_length}, features={len(self.features)}")
+            print(f"✓ Loaded parameters: seq_length={self.seq_length}, features={len(self.features)}")
             
         except FileNotFoundError as e:
             raise FileNotFoundError(f"Training artifacts not found. Run training script first. Error: {e}")
@@ -84,7 +64,7 @@ class WorkloadPredictor:
     def predict_future(self, node_name: str, future_steps: int = 200, 
                       plot: bool = True, save_plot: bool = True) -> Dict[str, Any]:
         """Predict future workload for a specific node"""
-        print(f"\nPredicting future workload for {node_name}...")
+        print(f"\n🔮 Predicting future workload for {node_name}...")
         
         # Load node model
         model_path = os.path.join(self.model_dir, f"{node_name}.h5")
@@ -97,7 +77,7 @@ class WorkloadPredictor:
         try:
             node_model = tf.keras.models.load_model(model_path)
         except Exception as e:
-            print(f"Loading with compatibility mode...")
+            print(f"  ⚠️  Loading with compatibility mode...")
             try:
                 # Try loading without compilation
                 node_model = tf.keras.models.load_model(model_path, compile=False)
@@ -110,7 +90,7 @@ class WorkloadPredictor:
             except Exception as e2:
                 raise RuntimeError(f"Failed to load model: {e2}")
         
-        print(f"Loaded model from {model_path}")
+        print(f"✓ Loaded model from {model_path}")
         
         # Load node data
         data_path = os.path.join("data", f"{node_name}.csv")
@@ -118,7 +98,7 @@ class WorkloadPredictor:
             raise FileNotFoundError(f"Data file not found: {data_path}")
         
         df_node = pd.read_csv(data_path)
-        print(f"Loaded data: {len(df_node)} historical points")
+        print(f"✓ Loaded data: {len(df_node)} historical points")
         
         # Validate features
         if not self.features:
@@ -143,7 +123,7 @@ class WorkloadPredictor:
             raise ValueError(f"Insufficient data. Need at least {self.seq_length} points.")
         
         # Generate predictions
-        print(f"Generating {future_steps} predictions...")
+        print(f"🚀 Generating {future_steps} predictions...")
         input_seq = X_node[-1].copy()
         predictions: List[float] = []
         
@@ -174,7 +154,7 @@ class WorkloadPredictor:
         predicted_max = float(predictions_rescaled.max())
         predicted_min = float(predictions_rescaled.min())
         
-        print(f"Prediction Statistics:")
+        print(f"📊 Prediction Statistics:")
         print(f"  Current avg (last 50): {current_avg:.2f}")
         print(f"  Predicted avg: {predicted_avg:.2f}")
         print(f"  Predicted range: {predicted_min:.2f} - {predicted_max:.2f}")
@@ -239,9 +219,9 @@ class WorkloadPredictor:
         
         if save_plot:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            plot_path = f'prediction_{node_name}_.png'
+            plot_path = f'prediction_{node_name}_{timestamp}.png'
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-            print(f"Plot saved as {plot_path}")
+            print(f"📈 Plot saved as {plot_path}")
         
         plt.show()
     
@@ -253,80 +233,19 @@ class WorkloadPredictor:
                 if file.endswith('.h5') and file != 'global_model.h5':
                     models.append(file.replace('.h5', ''))
         return sorted(models)
-    
-    def predict_with_edge(self, node_name: str, steps_ahead: int = 10) -> Dict[str, Any]:
-        """Use edge predictor for lightweight inference"""
-        if not self.edge_predictor:
-            raise RuntimeError("Edge predictor not initialized. Set use_tflite=True in constructor.")
-        
-        # Initialize edge predictor for this node if needed
-        if not hasattr(self.edge_predictor, 'tflite_interpreter') or self.edge_predictor.tflite_interpreter is None:
-            self.edge_predictor._initialize_tflite_model(node_name)
-        
-        # Load node data for context
-        data_path = os.path.join("data", f"{node_name}.csv")
-        if not os.path.exists(data_path):
-            # Try relative path from current working directory
-            data_path = os.path.join(os.path.dirname(__file__), "data", f"{node_name}.csv")
-            if not os.path.exists(data_path):
-                raise FileNotFoundError(f"Data file not found: {data_path}")
-        
-        df_node = pd.read_csv(data_path)
-        recent_data = df_node[self.features[0]].tail(10).values
-        
-        # Use edge predictor for real-time inference
-        predictions = []
-        for _ in range(steps_ahead):
-            # Simulate real-time prediction
-            if recent_data.size > 0:
-                current_value = recent_data[-1]
-                # Simple trend-based prediction for demo
-                predicted = current_value * (1 + np.random.normal(0, 0.1))
-                predictions.append(max(0, predicted))
-                recent_data = np.append(recent_data[1:], predicted)
-            else:
-                predictions.append(1.0)
-        
-        return {
-            'predictions': np.array(predictions),
-            'stats': {
-                'current_avg': float(recent_data.mean()) if recent_data.size > 0 else 1.0,
-                'predicted_avg': float(np.mean(predictions)),
-                'predicted_max': float(np.max(predictions)),
-                'predicted_min': float(np.min(predictions))
-            }
-        }
-    
-    def get_memory_usage(self) -> Dict[str, float]:
-        """Get memory usage for edge deployment monitoring"""
-        if self.edge_predictor:
-            return self.edge_predictor.get_memory_usage()
-        else:
-            return {'total_memory_mb': 0, 'model_memory_mb': 0, 'history_memory_mb': 0}
 
 def main() -> None:
     """Main function with proper argument parsing"""
-    parser = argparse.ArgumentParser(description='LSTM Workload Predictor - Edge Deployment Compatible')
+    parser = argparse.ArgumentParser(description='LSTM Workload Predictor')
     parser.add_argument('--node', type=str, help='Node name to predict (e.g., system-1)')
     parser.add_argument('--steps', type=int, default=200, help='Number of future steps')
     parser.add_argument('--all', action='store_true', help='Predict for all nodes')
     parser.add_argument('--list', action='store_true', help='List available models')
-    parser.add_argument('--edge', action='store_true', help='Use TFLite edge deployment mode')
-    parser.add_argument('--memory', action='store_true', help='Show memory usage statistics')
     
     args = parser.parse_args()
     
     try:
-        # Set correct model directory path
-        model_dir = os.path.join(os.path.dirname(__file__), 'models')
-        predictor = WorkloadPredictor(model_dir=model_dir, use_tflite=args.edge)
-        
-        if args.memory:
-            memory_stats = predictor.get_memory_usage()
-            print("Memory Usage Statistics:")
-            for key, value in memory_stats.items():
-                print(f"  {key}: {value:.2f} MB")
-            return
+        predictor = WorkloadPredictor()
         
         if args.list:
             nodes = predictor.list_available_nodes()
@@ -334,24 +253,14 @@ def main() -> None:
             return
         
         if args.node:
-            if args.edge:
-                result = predictor.predict_with_edge(args.node, args.steps)
-                print(f"Edge prediction results for {args.node}:")
-                print(f"  Predicted average: {result['stats']['predicted_avg']:.2f}")
-                print(f"  Predicted range: {result['stats']['predicted_min']:.2f} - {result['stats']['predicted_max']:.2f}")
-            else:
-                predictor.predict_future(args.node, args.steps)
+            predictor.predict_future(args.node, args.steps)
         elif args.all:
             nodes = predictor.list_available_nodes()
             for node in nodes:
                 try:
-                    if args.edge:
-                        result = predictor.predict_with_edge(node, args.steps)
-                        print(f"{node}: avg={result['stats']['predicted_avg']:.2f}")
-                    else:
-                        predictor.predict_future(node, args.steps, plot=False, save_plot=False)
+                    predictor.predict_future(node, args.steps, plot=False, save_plot=False)
                 except Exception as e:
-                    print(f"Failed to predict {node}: {e}")
+                    print(f"❌ Failed to predict {node}: {e}")
         else:
             # Interactive mode
             nodes = predictor.list_available_nodes()
@@ -360,7 +269,6 @@ def main() -> None:
                 return
             
             print(f"Available nodes: {nodes}")
-            print(f"Mode: {'Edge (TFLite)' if args.edge else 'Full TensorFlow'}")
             node_choice = input("Enter node name: ").strip()
             
             if node_choice not in nodes:
@@ -370,16 +278,10 @@ def main() -> None:
             steps_input = input("Future steps (default 200): ").strip()
             steps = int(steps_input) if steps_input.isdigit() else 200
             
-            if args.edge:
-                result = predictor.predict_with_edge(node_choice, steps)
-                print(f"Edge prediction results:")
-                print(f"  Predicted average: {result['stats']['predicted_avg']:.2f}")
-                print(f"  Predicted range: {result['stats']['predicted_min']:.2f} - {result['stats']['predicted_max']:.2f}")
-            else:
-                predictor.predict_future(node_choice, steps)
+            predictor.predict_future(node_choice, steps)
     
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -7,7 +7,6 @@ import json
 import time
 from typing import Dict, List, Callable, Optional
 from dataclasses import dataclass, field
-from datetime import datetime
 
 
 @dataclass
@@ -17,7 +16,7 @@ class MQTTMessage:
     payload: str
     qos: int = 1
     retain: bool = False
-    timestamp: float = field(default_factory=time.time)
+
 
 
 @dataclass
@@ -137,7 +136,6 @@ class MQTTSimulationEnvironment:
         payload = {
             "sensor_id": sensor_id,
             "edge_node": edge_id,
-            "timestamp": self.simulation_time,
             "reading": reading
         }
         self.broker.publish(sensor_id, topic, payload, qos=2, retain=False)
@@ -156,7 +154,6 @@ class MQTTSimulationEnvironment:
         payload = {
             "sensor_id": sensor_id,
             "assigned_edge_node": edge_id,
-            "timestamp": self.simulation_time,
             "assignment_info": assignment_info
         }
         self.broker.publish(f"sensor_{sensor_id}", topic, payload, qos=1, retain=True)
@@ -170,7 +167,6 @@ class MQTTSimulationEnvironment:
         """Publish simulation metrics to MQTT"""
         topic = "simulation/metrics"
         payload = {
-            "timestamp": self.simulation_time,
             "metrics": metrics
         }
         self.broker.publish("simulation", topic, payload, qos=1, retain=True)
@@ -244,7 +240,6 @@ class MQTTSimulationEnvironment:
         """Publish simulation start event"""
         topic = "simulation/lifecycle/start"
         payload = {
-            "timestamp": self.simulation_time,
             "config": config,
             "event": "simulation_started"
         }
@@ -259,7 +254,6 @@ class MQTTSimulationEnvironment:
         """Publish simulation end event with final metrics"""
         topic = "simulation/lifecycle/end"
         payload = {
-            "timestamp": self.simulation_time,
             "metrics": metrics,
             "event": "simulation_completed"
         }

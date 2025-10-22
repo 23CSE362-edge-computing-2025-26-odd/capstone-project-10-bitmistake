@@ -1,7 +1,6 @@
 from .olb_algorithm import OLBLatencyCalculator
 import logging
 import os
-from datetime import datetime
 
 
 class MetricsDefinitions:
@@ -116,7 +115,6 @@ class PerformanceMetrics:
     def _setup_logging(self):
         """Setup logging to file for metrics tracking"""
         os.makedirs("logs", exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = f"logs/metrics_.log"
         
         # Create logger
@@ -161,9 +159,15 @@ class PerformanceMetrics:
         self.logger.info(f"Module assignments: {len(placement.module_assignments)} nodes have assignments")
         
         # Check if assignments are empty - raise error instead of generating synthetic data
-        if not placement.module_assignments or all(len(sensors) == 0 for sensors in placement.module_assignments.values()):
-            self.logger.error(f"[ERROR] Placement algorithm {algorithm_name} failed to assign any sensors!")
-            raise ValueError(f"Placement algorithm {algorithm_name} failed to assign any sensors!")
+        if not placement.module_assignments:
+            self.logger.error(f"[ERROR] Placement algorithm {algorithm_name} has empty module_assignments dictionary!")
+            self.logger.error(f"[ERROR] This indicates the placement algorithm failed to run or crashed during execution")
+            raise ValueError(f"Placement algorithm {algorithm_name} failed to assign any sensors - empty assignments!")
+        
+        if all(len(sensors) == 0 for sensors in placement.module_assignments.values()):
+            self.logger.error(f"[ERROR] Placement algorithm {algorithm_name} has assignments but all are empty!")
+            self.logger.error(f"[ERROR] Assignment keys: {list(placement.module_assignments.keys())}")
+            raise ValueError(f"Placement algorithm {algorithm_name} failed to assign any sensors - all lists empty!")
         
         # Count total assignments
         total_assignments = sum(len(sensors) for sensors in placement.module_assignments.values())

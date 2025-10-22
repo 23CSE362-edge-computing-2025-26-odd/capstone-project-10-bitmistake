@@ -193,19 +193,71 @@ class HospitalVisualizationEngine:
     
     def generate_all_visualizations(self):
         """Generate all visualization types"""
+        # Validate data before generating visualizations
+        if not self._validate_data():
+            print("[ERROR] Data validation failed - skipping visualizations")
+            return
+        
+        print(f"[INFO] Generating visualizations for {len(self.results.get('algorithms', []))} algorithms...")
         self._create_algorithm_comparison_charts()
         self._create_scenario_timelines()
         self._create_distribution_boxplot()
         self._create_node_utilization_heatmap()
         print(f"[OK] All visualizations generated in {self.output_dir}/")
     
+    def _validate_data(self) -> bool:
+        """Validate that we have sufficient data for visualization"""
+        algorithms = self.results.get('algorithms', [])
+        scenarios = self.results.get('scenarios', [])
+        
+        if not algorithms:
+            print("[ERROR] No algorithms found in results")
+            return False
+        
+        if not scenarios:
+            print("[ERROR] No scenarios found in results")
+            return False
+        
+        if not self.metrics:
+            print("[ERROR] No metrics extracted from results")
+            return False
+        
+        # Check for duplicate algorithms (like OLB and Predictive being identical)
+        unique_signatures = {}
+        for algo in algorithms:
+            algo_metrics = [m for m in self.metrics if m['algorithm_name'] == algo]
+            if algo_metrics:
+                # Create signature from first metric
+                signature = (
+                    algo_metrics[0]['latency_avg'],
+                    algo_metrics[0]['energy_consumption'],
+                    algo_metrics[0]['load_balance_score']
+                )
+                if signature in unique_signatures:
+                    print(f"[WARNING] Algorithm '{algo}' has identical metrics to '{unique_signatures[signature]}'")
+                    print(f"[WARNING] This suggests '{algo}' may be using fallback behavior")
+                else:
+                    unique_signatures[signature] = algo
+        
+        print(f"[INFO] Data validation passed:")
+        print(f"  - {len(algorithms)} algorithms")
+        print(f"  - {len(scenarios)} scenarios")
+        print(f"  - {len(self.metrics)} total metrics")
+        print(f"  - {len(unique_signatures)} unique algorithm behaviors")
+        
+        return True
+    
     def _create_algorithm_comparison_charts(self):
         """Create 4 algorithm comparison bar charts"""
         algorithms = self.results.get('algorithms', [])
         
         if not algorithms or not self.metrics:
-            print("[WARNING] No data available for algorithm comparison charts")
+            print("[ERROR] No data available for algorithm comparison charts")
+            print(f"  - Algorithms found: {len(algorithms)}")
+            print(f"  - Metrics found: {len(self.metrics)}")
             return
+        
+        print(f"[DEBUG] Creating comparison charts for {len(algorithms)} algorithms with {len(self.metrics)} metrics")
         
         # Chart 1: Latency Comparison
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -214,7 +266,9 @@ class HospitalVisualizationEngine:
         avg_latencies = []
         for algo in algorithms:
             algo_metrics = [m['latency_avg'] for m in self.metrics if m['algorithm_name'] == algo]
-            avg_latencies.append(statistics.mean(algo_metrics) if algo_metrics else 0.0)
+            avg_lat = statistics.mean(algo_metrics) if algo_metrics else 0.0
+            avg_latencies.append(avg_lat)
+            print(f"[DEBUG] {algo}: {len(algo_metrics)} samples, avg latency = {avg_lat:.2f}ms")
         
         bars = ax.bar(algorithms, avg_latencies,
                      color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b'])
@@ -288,16 +342,30 @@ class HospitalVisualizationEngine:
         scenarios_list = list(set([m['scenario_name'] for m in self.metrics]))
         algorithms = self.results.get('algorithms', [])
         
+        print(f"[DEBUG] Creating timeline charts for {len(scenarios_list)} scenarios")
+        
         for scenario in scenarios_list:
             fig, ax = plt.subplots(figsize=(12, 6))
             scenario_metrics = [m for m in self.metrics if m['scenario_name'] == scenario]
             
+            print(f"[DEBUG] Scenario '{scenario}': {len(scenario_metrics)} metrics")
+            
             colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+            plotted_count = 0
             for i, algo in enumerate(algorithms):
                 algo_latencies = [m['latency_avg'] for m in scenario_metrics if m['algorithm_name'] == algo]
                 if algo_latencies:
                     ax.plot(range(len(algo_latencies)), algo_latencies, marker='o', label=algo, 
                            color=colors[i % len(colors)], linewidth=2, markersize=8)
+                    plotted_count += 1
+                    print(f"[DEBUG]   - {algo}: {len(algo_latencies)} data points")
+                else:
+                    print(f"[WARNING]   - {algo}: No data points found")
+            
+            if plotted_count == 0:
+                print(f"[WARNING] No data to plot for scenario '{scenario}' - skipping")
+                plt.close(fig)
+                continue
             
             ax.set_xlabel('Iteration', fontsize=12)
             ax.set_ylabel('Latency (ms)', fontsize=12)
@@ -316,11 +384,23 @@ class HospitalVisualizationEngine:
         algorithms = self.results.get('algorithms', [])
         
         data_by_algo = []
+        valid_algorithms = []
         for algo in algorithms:
             latencies = [m['latency_avg'] for m in self.metrics if m['algorithm_name'] == algo]
-            data_by_algo.append(latencies)
+            if latencies:
+                data_by_algo.append(latencies)
+                valid_algorithms.append(algo)
+                print(f"[DEBUG] Boxplot - {algo}: {len(latencies)} samples, "
+                      f"range [{min(latencies):.2f}, {max(latencies):.2f}]")
+            else:
+                print(f"[WARNING] Boxplot - {algo}: No data, skipping")
         
-        bp = ax.boxplot(data_by_algo, labels=algorithms, patch_artist=True)
+        if not data_by_algo:
+            print("[ERROR] No data available for boxplot")
+            plt.close(fig)
+            return
+        
+        bp = ax.boxplot(data_by_algo, labels=valid_algorithms, patch_artist=True)
         
         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
         for patch, color in zip(bp['boxes'], colors):
@@ -340,15 +420,29 @@ class HospitalVisualizationEngine:
         algorithms = self.results.get('algorithms', [])
         scenarios_list = list(set([m['scenario_name'] for m in self.metrics]))
         
+        print(f"[DEBUG] Creating heatmap for {len(algorithms)} algorithms x {len(scenarios_list)} scenarios")
+        
         # Create matrix: algorithms x scenarios
         data = []
         for algo in algorithms:
             row = []
             for scenario in scenarios_list:
-                cpu_util = statistics.mean([m['cpu_utilization_percent'] for m in self.metrics 
-                                          if m['algorithm_name'] == algo and m['scenario_name'] == scenario])
-                row.append(cpu_util)
+                matching_metrics = [m['cpu_utilization_percent'] for m in self.metrics 
+                                   if m['algorithm_name'] == algo and m['scenario_name'] == scenario]
+                if matching_metrics:
+                    cpu_util = statistics.mean(matching_metrics)
+                    row.append(cpu_util)
+                    print(f"[DEBUG] Heatmap - {algo}/{scenario}: {cpu_util:.1f}% CPU")
+                else:
+                    row.append(0.0)
+                    print(f"[WARNING] Heatmap - {algo}/{scenario}: No data, using 0%")
             data.append(row)
+        
+        # Check if we have any non-zero data
+        if all(all(val == 0.0 for val in row) for row in data):
+            print("[ERROR] All heatmap values are zero - no utilization data available")
+            plt.close(fig)
+            return
         
         im = ax.imshow(data, cmap='YlOrRd', aspect='auto')
         ax.set_xticks(range(len(scenarios_list)))
