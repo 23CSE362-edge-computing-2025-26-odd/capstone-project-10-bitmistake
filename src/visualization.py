@@ -2,8 +2,9 @@ import json
 import os
 import statistics
 
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
-# import matplotlib.patches as mpatches  # Not currently used
 import numpy as np
 from typing import Dict, List, Any
 
@@ -21,7 +22,7 @@ class SimulationVisualizer:
         if save_path is None:
             save_path = f"environment_{algorithm_name.lower()}.png"
 
-        plt.figure(figsize=(12, 8))
+        fig = plt.figure(figsize=(12, 8))
 
         # Plot edge nodes
         for i, edge_node in enumerate(digital_twin.edge_nodes):
@@ -64,6 +65,7 @@ class SimulationVisualizer:
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
         print(f"Environment plot saved: {save_path}")
         return save_path
 
@@ -116,6 +118,7 @@ class SimulationVisualizer:
 
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
         print(f"Performance comparison saved: {save_path}")
         return save_path
 
@@ -169,8 +172,14 @@ class HospitalVisualizationEngine:
         self.metrics = self._extract_metrics()
         os.makedirs(output_dir, exist_ok=True)
         
-        # Set style
-        plt.style.use('seaborn-v0_8-darkgrid')
+        # Set style - use default if seaborn not available
+        try:
+            plt.style.use('seaborn-v0_8-darkgrid')
+        except:
+            try:
+                plt.style.use('seaborn-darkgrid')
+            except:
+                plt.style.use('default')
     
     def _extract_metrics(self) -> List[Dict]:
         """Extract all metrics from results"""
@@ -194,25 +203,34 @@ class HospitalVisualizationEngine:
         """Create 4 algorithm comparison bar charts"""
         algorithms = self.results.get('algorithms', [])
         
+        if not algorithms or not self.metrics:
+            print("[WARNING] No data available for algorithm comparison charts")
+            return
+        
         # Chart 1: Latency Comparison
         fig, ax = plt.subplots(figsize=(12, 6))
-        latencies = [m['latency_avg'] for m in self.metrics if m['algorithm_name'] in algorithms]
-        algo_names = [m['algorithm_name'] for m in self.metrics if m['algorithm_name'] in algorithms]
         
-        bars = ax.bar(algorithms, 
-                     [statistics.mean([m['latency_avg'] for m in self.metrics if m['algorithm_name'] == a]) 
-                      for a in algorithms],
+        # Calculate average latency for each algorithm
+        avg_latencies = []
+        for algo in algorithms:
+            algo_metrics = [m['latency_avg'] for m in self.metrics if m['algorithm_name'] == algo]
+            avg_latencies.append(statistics.mean(algo_metrics) if algo_metrics else 0.0)
+        
+        bars = ax.bar(algorithms, avg_latencies,
                      color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b'])
         ax.set_ylabel('Latency (ms)', fontsize=12)
         ax.set_title('Algorithm Comparison: Average Latency', fontsize=14, fontweight='bold')
         ax.set_ylim(bottom=0)
+        
+        # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{height:.2f}', ha='center', va='bottom', fontsize=10)
+        
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'comparison_latency.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.close(fig)
         
         # Chart 2: Energy Consumption
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -229,7 +247,7 @@ class HospitalVisualizationEngine:
                    f'{height:.2f}', ha='center', va='bottom', fontsize=10)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'comparison_energy.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.close(fig)
         
         # Chart 3: Load Balance Score
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -246,7 +264,7 @@ class HospitalVisualizationEngine:
                    f'{height:.2f}', ha='center', va='bottom', fontsize=10)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'comparison_load_balance.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.close(fig)
         
         # Chart 4: SLA Compliance
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -263,7 +281,7 @@ class HospitalVisualizationEngine:
                    f'{height:.1f}%', ha='center', va='bottom', fontsize=10)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'comparison_sla_compliance.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.close(fig)
     
     def _create_scenario_timelines(self):
         """Create line charts for each scenario"""
@@ -290,7 +308,7 @@ class HospitalVisualizationEngine:
             
             filename = f"hospital_{scenario.lower().replace(' ', '_')}_latency_timeline.png"
             plt.savefig(os.path.join(self.output_dir, filename), dpi=300, bbox_inches='tight')
-            plt.close()
+            plt.close(fig)
     
     def _create_distribution_boxplot(self):
         """Create box plot for latency distribution"""
@@ -314,7 +332,7 @@ class HospitalVisualizationEngine:
         ax.grid(True, alpha=0.3, axis='y')
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'latency_distribution_boxplot.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.close(fig)
     
     def _create_node_utilization_heatmap(self):
         """Create heatmap for node utilization"""
@@ -351,7 +369,7 @@ class HospitalVisualizationEngine:
         
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'node_utilization_heatmap.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.close(fig)
     
     def get_performance_summary(self) -> Dict:
         """Generate performance summary"""
