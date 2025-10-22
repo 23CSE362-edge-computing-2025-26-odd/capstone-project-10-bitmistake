@@ -25,6 +25,7 @@ from src import (
     PerformanceMetrics,
     SimulationVisualizer
 )
+from src.orchestrator import setup_directories
 
 app = Flask(__name__)
 CORS(app)
@@ -90,9 +91,8 @@ def simulate():
         app_obj = create_smart_healthcare_application(environment)
         topology = create_yafs_topology(environment)
         
-        # Create config directory if it doesn't exist
-        config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
-        os.makedirs(config_dir, exist_ok=True)
+        # Setup directories using orchestrator
+        setup_directories(["config", "results"])
         
         placement_json = create_placement_json(config_dir)
         
@@ -115,9 +115,8 @@ def simulate():
         from yafs.core import Sim
         from yafs.population import Population
         
-        # Create results directory if it doesn't exist
+        # Results directory already created by setup_directories
         results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
-        os.makedirs(results_dir, exist_ok=True)
         
         s = Sim(topology, default_results_path=os.path.join(results_dir, f"sim_{algorithm}"))
         population = Population(name="WebUI")
@@ -247,10 +246,11 @@ def compare_algorithms():
             app_obj = create_smart_healthcare_application(environment)
             topology = create_yafs_topology(environment)
             
-            # Create config directory if it doesn't exist
-            config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
-            os.makedirs(config_dir, exist_ok=True)
+            # Setup directories using orchestrator (only once per comparison)
+            if algorithm == algorithms_to_compare[0]:
+                setup_directories(["config", "results"])
             
+            config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
             placement_json = create_placement_json(config_dir)
             
             # Select algorithm
@@ -275,9 +275,8 @@ def compare_algorithms():
             from yafs.core import Sim
             from yafs.population import Population
             
-            # Create results directory if it doesn't exist
+            # Results directory already created by setup_directories
             results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
-            os.makedirs(results_dir, exist_ok=True)
             
             s = Sim(topology, default_results_path=os.path.join(results_dir, f"compare_{algorithm}"))
             population = Population(name=f"Compare_{algorithm}")
@@ -547,8 +546,9 @@ def test_algorithms():
         app_obj = create_smart_healthcare_application(env)
         topology = create_yafs_topology(env)
         
+        # Setup directories using orchestrator
+        setup_directories(["config", "results"])
         config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
-        os.makedirs(config_dir, exist_ok=True)
         placement_json = create_placement_json(config_dir)
         
         test_results = {}
@@ -575,8 +575,8 @@ def test_algorithms():
             from yafs.core import Sim
             from yafs.population import Population
             
+            # Results directory already created by setup_directories
             results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
-            os.makedirs(results_dir, exist_ok=True)
             
             s = Sim(test_topo, default_results_path=os.path.join(results_dir, f"test_{alg_name}"))
             pop = Population(name=f"Test_{alg_name}")
