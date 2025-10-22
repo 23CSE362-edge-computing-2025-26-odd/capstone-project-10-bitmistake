@@ -3,7 +3,6 @@ from .devices import EdgeNodeDevice, SensorDevice
 from .environment import DigitalTwinEnvironment
 from .metrics import PerformanceMetrics, MetricsDefinitions
 from .olb_algorithm import OLBLatencyCalculator, OLBPlacement
-from .scenario_adapter import ScenarioToEnvironmentAdapter
 from .utils import SimulationConfig, create_placement_json, save_results
 from .visualization import SimulationVisualizer, HospitalVisualizationEngine
 from .common_utils import (
@@ -132,7 +131,6 @@ __all__ = [
     "MEC",
     "FNPA",
     "MetricsDefinitions",
-    "ScenarioToEnvironmentAdapter",
     "PREDICTIVE_AVAILABLE",
     "WORKLOAD_PREDICTOR_AVAILABLE",
     # Common utilities
