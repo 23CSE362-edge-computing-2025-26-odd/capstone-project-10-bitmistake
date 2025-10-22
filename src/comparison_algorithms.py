@@ -24,6 +24,14 @@ class LBS(Placement):
         self.module_assignments: Dict[int, List] = {}
         self.activation_dist = None
         self.sensor_lookup = SensorLookupIndex(digital_twin.sensors)
+        
+        # Track node capacity to prevent saturation
+        self.node_capacities: Dict[int, float] = {
+            i: edge_node.processingPower for i, edge_node in enumerate(digital_twin.edge_nodes)
+        }
+        self.node_loads: Dict[int, float] = {
+            i: 0.0 for i in range(len(digital_twin.edge_nodes))
+        }
 
     def initial_allocation(self, sim, app_name: str):
         """Deploy modules using location-based selection"""
@@ -42,8 +50,8 @@ class LBS(Placement):
             sensor = self.sensor_lookup.find_by_id(sensor_id)
             
             if sensor:
-                # Find nearest edge node
-                optimal_node_id, distance = self._find_nearest_edge_node(sensor)
+                # Find nearest edge node that's not saturated
+                optimal_node_id, distance = self._find_nearest_available_edge_node(sensor)
                 
                 if optimal_node_id is not None:
                     node_name = f"edge_{optimal_node_id}"
@@ -54,28 +62,52 @@ class LBS(Placement):
                         self.module_assignments[optimal_node_id] = []
                     self.module_assignments[optimal_node_id].append(sensor)
                     
+                    # Update load tracking
+                    workload = sensor.averageFlowSize * sensor.averageFlowRate
+                    self.node_loads[optimal_node_id] += workload / self.node_capacities[optimal_node_id]
+                    
                     placement_count += 1
                     total_distance += distance
                     
+                    utilization = (self.node_loads[optimal_node_id] * 100)
                     print(f"  [LBS] Sensor {sensor_id} -> edge_{optimal_node_id} "
-                          f"(distance: {distance:.2f}m)")
+                          f"(distance: {distance:.2f}m, util: {utilization:.1f}%)")
         
         avg_distance = total_distance / placement_count if placement_count > 0 else 0
         print(f"\n[LBS] Placement Complete: {placement_count} modules placed")
         print(f"[LBS] Average Distance: {avg_distance:.2f}m")
         print(f"{'='*70}\n")
     
-    def _find_nearest_edge_node(self, sensor) -> Tuple[Optional[int], float]:
-        """Find the nearest edge node to the sensor"""
+    def _find_nearest_available_edge_node(self, sensor) -> Tuple[Optional[int], float]:
+        """Find the nearest edge node to the sensor that isn't saturated"""
         min_distance = float("inf")
         nearest_node_id = None
         
+        # Calculate workload for this sensor
+        workload = sensor.averageFlowSize * sensor.averageFlowRate
+        
         for i, edge_node in enumerate(self.digital_twin.edge_nodes):
+            # Calculate utilization if this sensor is added
+            potential_load = self.node_loads[i] + (workload / self.node_capacities[i])
+            
+            # Skip nodes that would be saturated (>85% utilization)
+            if potential_load > 0.85:
+                continue
+            
             distance = calculate_euclidean_distance(sensor.coordinates, edge_node.coordinates)
             
             if distance < min_distance:
                 min_distance = distance
                 nearest_node_id = i
+        
+        # If all nodes are saturated, find the one with lowest load
+        if nearest_node_id is None:
+            min_load = float("inf")
+            for i in range(len(self.digital_twin.edge_nodes)):
+                if self.node_loads[i] < min_load:
+                    min_load = self.node_loads[i]
+                    nearest_node_id = i
+                    min_distance = calculate_euclidean_distance(sensor.coordinates, self.digital_twin.edge_nodes[i].coordinates)
         
         return nearest_node_id, min_distance
 
@@ -425,17 +457,16 @@ class FNPA(Placement):
                         self.module_assignments[optimal_node_id] = []
                     self.module_assignments[optimal_node_id].append(sensor)
                     
-                    # Update resource tracking
+                    # Update resource tracking (normalize by capacity)
                     workload = sensor.averageFlowSize * sensor.averageFlowRate
-                    self.node_loads[optimal_node_id] += workload
+                    self.node_loads[optimal_node_id] += workload / self.node_capacities[optimal_node_id]
                     
                     bandwidth_demand = sensor.flowTrafficSize * sensor.averageFlowRate
                     edge_node = self.digital_twin.edge_nodes[optimal_node_id]
                     self.node_bandwidth_usage[optimal_node_id] += bandwidth_demand / edge_node.bandwidth
                     
                     edge_count += 1
-                    utilization = (self.node_loads[optimal_node_id] / 
-                                 self.node_capacities[optimal_node_id] * 100)
+                    utilization = (self.node_loads[optimal_node_id] * 100)
                     
                     print(f"  [FNPA] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(util: {utilization:.1f}%)")
@@ -459,14 +490,17 @@ class FNPA(Placement):
         """Find nearest edge node with available resources"""
         # Create list of (distance, node_id) pairs
         candidates = []
+        
+        # Calculate workload for this sensor (normalized)
+        workload = (sensor.averageFlowSize * sensor.averageFlowRate)
 
         for i, edge_node in enumerate(self.digital_twin.edge_nodes):
-            # Check resource availability
-            utilization = self.node_loads[i] / self.node_capacities[i]
+            # Check resource availability (already normalized)
+            potential_utilization = self.node_loads[i] + (workload / self.node_capacities[i])
             bandwidth_util = self.node_bandwidth_usage[i]
             
             # Skip overloaded nodes
-            if utilization >= self.resource_threshold:
+            if potential_utilization >= self.resource_threshold:
                 continue
             if bandwidth_util >= self.bandwidth_threshold:
                 continue
@@ -488,7 +522,7 @@ class FNPA(Placement):
         """Print resource utilization status"""
         print(f"\n[FNPA] Resource Utilization:")
         for i in range(len(self.digital_twin.edge_nodes)):
-            utilization = (self.node_loads[i] / self.node_capacities[i] * 100)
+            utilization = (self.node_loads[i] * 100)  # Already normalized
             bandwidth_util = self.node_bandwidth_usage[i] * 100
             assignments = len(self.module_assignments.get(i, []))
             status = "SATURATED" if utilization >= self.resource_threshold * 100 else "AVAILABLE"

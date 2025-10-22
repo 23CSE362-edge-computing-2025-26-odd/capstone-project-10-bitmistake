@@ -1,0 +1,237 @@
+{
+  "simulation_config": {
+    "environment": {
+      "width": 3000,
+      "height": 2000
+    },
+    "devices": {
+      "num_sensors": 10,
+      "num_edge_nodes": 6
+    },
+    "simulation": {
+      "time": 1000,
+      "seed": 42
+    },
+    "output": {
+      "dir": ".",
+      "results_file": "yafs_olb_results.txt"
+    }
+  },
+  "performance_metrics": {
+    "algorithm": "LAB",
+    "overall_latency": 10.072347252054213,
+    "communication_latency": 1.6696432933349843,
+    "computing_latency": 8.40270395871923,
+    "latency_min": 0.09991989173836428,
+    "latency_max": 1.620447449304273,
+    "latency_p99": 1.620447449304273,
+    "network_usage": 5.075971518852187,
+    "execution_time": 1.0072347252054212,
+    "energy_consumption": 61.317065009887756,
+    "cost_of_execution": 2.4873746013457856,
+    "load_balance_score": 0.6428571428571428,
+    "max_utilization": 3,
+    "cpu_utilization": 66.31919177223267,
+    "memory_utilization": 80.0,
+    "num_assignments": 10,
+    "detailed_assignments": [
+      {
+        "sensor_id": 0,
+        "edge_node_id": 5,
+        "comm_latency": 0.0028799088754616472,
+        "comp_latency": 0.39966076424930264,
+        "total_latency": 0.40254067312476427,
+        "energy": 6.401394193560457,
+        "distance": 504.483287200047,
+        "sensor_coordinates": [
+          1918.2803953736513,
+          50.021510445333874
+        ],
+        "edge_node_coordinates": [
+          2119.1129465870445,
+          512.8062049170558
+        ]
+      },
+      {
+        "sensor_id": 1,
+        "edge_node_id": 0,
+        "comm_latency": 0.10930960814386799,
+        "comp_latency": 1.014967476084465,
+        "total_latency": 1.124277084228333,
+        "energy": 2.6491131030019877,
+        "distance": 1469.7005205661046,
+        "sensor_coordinates": [
+          2676.538703114536,
+          173.8776652588323
+        ],
+        "edge_node_coordinates": [
+          1498.2122545196262,
+          1052.2661901690717
+        ]
+      },
+      {
+        "sensor_id": 4,
+        "edge_node_id": 0,
+        "comm_latency": 0.30390557442010735,
+        "comp_latency": 1.014967476084465,
+        "total_latency": 1.3188730505045723,
+        "energy": 2.945291620238344,
+        "distance": 1424.7810596463657,
+        "sensor_coordinates": [
+          2871.6392166203436,
+          673.1890902252535
+        ],
+        "edge_node_coordinates": [
+          1498.2122545196262,
+          1052.2661901690717
+        ]
+      },
+      {
+        "sensor_id": 8,
+        "edge_node_id": 0,
+        "comm_latency": 0.01886145591036004,
+        "comp_latency": 1.014967476084465,
+        "total_latency": 1.033828931994825,
+        "energy": 2.7426197383980195,
+        "distance": 520.7907155867358,
+        "sensor_coordinates": [
+          1907.0533327932005,
+          729.6643579401684
+        ],
+        "edge_node_coordinates": [
+          1498.2122545196262,
+          1052.2661901690717
+        ]
+      },
+      {
+        "sensor_id": 2,
+        "edge_node_id": 2,
+        "comm_latency": 0.00216384185668276,
+        "comp_latency": 1.462832967380221,
+        "total_latency": 1.4649968092369037,
+        "energy": 5.331426801369272,
+        "distance": 125.11951965963915,
+        "sensor_coordinates": [
+          79.60790905159088,
+          397.675301373297
+        ],
+        "edge_node_coordinates": [
+          193.44929710340617,
+          449.5890044418976
+        ]
+      },
+      {
+        "sensor_id": 3,
+        "edge_node_id": 3,
+        "comm_latency": 0.3189616428193403,
+        "comp_latency": 0.5751386333435153,
+        "total_latency": 0.8941002761628556,
+        "energy": 16.134239512308106,
+        "distance": 1698.1550162943674,
+        "sensor_coordinates": [
+          2428.29137003348,
+          12.997519356122034
+        ],
+        "edge_node_coordinates": [
+          1260.797544349595,
+          1246.1595631912905
+        ]
+      },
+      {
+        "sensor_id": 5,
+        "edge_node_id": 3,
+        "comm_latency": 0.2086876835915548,
+        "comp_latency": 0.5751386333435153,
+        "total_latency": 0.7838263169350701,
+        "energy": 12.356662674196796,
+        "distance": 1180.0260271523466,
+        "sensor_coordinates": [
+          2421.384819823141,
+          1459.4635733876357
+        ],
+        "edge_node_coordinates": [
+          1260.797544349595,
+          1246.1595631912905
+        ]
+      },
+      {
+        "sensor_id": 6,
+        "edge_node_id": 1,
+        "comm_latency": 0.19523637883990436,
+        "comp_latency": 1.1343003899843476,
+        "total_latency": 1.3295367688242519,
+        "energy": 10.681053175394474,
+        "distance": 2023.9107270887275,
+        "sensor_coordinates": [
+          2488.2139927589847,
+          1237.0395047284921
+        ],
+        "edge_node_coordinates": [
+          728.5543329477696,
+          237.13325269388258
+        ]
+      },
+      {
+        "sensor_id": 9,
+        "edge_node_id": 1,
+        "comm_latency": 0.48614705931992547,
+        "comp_latency": 1.1343003899843476,
+        "total_latency": 1.620447449304273,
+        "energy": 1.0429385550010906,
+        "distance": 1562.1075106802452,
+        "sensor_coordinates": [
+          1944.1061557397807,
+          1218.2620113339765
+        ],
+        "edge_node_coordinates": [
+          728.5543329477696,
+          237.13325269388258
+        ]
+      },
+      {
+        "sensor_id": 7,
+        "edge_node_id": 4,
+        "comm_latency": 0.023490139557779486,
+        "comp_latency": 0.0764297521805848,
+        "total_latency": 0.09991989173836428,
+        "energy": 1.0323256364192028,
+        "distance": 588.8955031364034,
+        "sensor_coordinates": [
+          683.6948269546406,
+          578.7759272042143
+        ],
+        "edge_node_coordinates": [
+          111.40398017227903,
+          717.6323289414235
+        ]
+      }
+    ],
+    "tasks_generated": 10,
+    "tasks_completed": 10,
+    "per_node_loads": {
+      "5": 1,
+      "0": 3,
+      "2": 1,
+      "3": 2,
+      "1": 2,
+      "4": 1
+    },
+    "per_task_latencies": [
+      0.40254067312476427,
+      1.124277084228333,
+      1.3188730505045723,
+      1.033828931994825,
+      1.4649968092369037,
+      0.8941002761628556,
+      0.7838263169350701,
+      1.3295367688242519,
+      1.620447449304273,
+      0.09991989173836428
+    ]
+  },
+  "simulation_metadata": {
+    "algorithm": "LAB",
+    "framework": "YAFS 1.0",
+    "simulation_time": 1000
+  }
+}

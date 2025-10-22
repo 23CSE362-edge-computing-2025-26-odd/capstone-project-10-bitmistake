@@ -1,9 +1,3 @@
-"""
-Hospital Scenario Comparison Framework
-Compares algorithms across 3 hospital scenarios with comprehensive metrics
-NOW WITH REAL YAFS SIMULATION (No more synthetic data!)
-"""
-
 import json
 import time
 import statistics
@@ -11,7 +5,6 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 
-# Check if predictive algorithms are available
 try:
     from . import PREDICTIVE_AVAILABLE
 except ImportError:

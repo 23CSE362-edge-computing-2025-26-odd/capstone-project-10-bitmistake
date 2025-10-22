@@ -1,0 +1,88 @@
+ YAFS OLB SIMULATION PERFORMANCE REPORT 
+
+KEY PERFORMANCE INDICATORS (KPIs):
+Overall Latency (L): 10005.6989
+  - Communication Latency: 5000.1326
+  - Computing Latency: 5005.5662
+Network Usage (Nusage): 5.0760 MB/s
+Execution Time (Te): 1000.5699 ms
+Energy Consumption (Etotal): 49.7023 W
+Cost of Execution (Ce): 1001.8177
+
+DETAILED ASSIGNMENT ANALYSIS:
+
+edge Node 5: 5 sensors assigned
+  Sensor 0: Total Latency = 2000.0000
+    - Communication Latency: 1000.0000
+    - Computing Latency: 1000.0000
+    - Sensor Position: (1918.2803953736513, 50.021510445333874)
+    - edge Node Position: (2119.1129465870445, 512.8062049170558)
+  Sensor 1: Total Latency = 2000.0000
+    - Communication Latency: 1000.0000
+    - Computing Latency: 1000.0000
+    - Sensor Position: (2676.538703114536, 173.8776652588323)
+    - edge Node Position: (2119.1129465870445, 512.8062049170558)
+  Sensor 3: Total Latency = 2000.0000
+    - Communication Latency: 1000.0000
+    - Computing Latency: 1000.0000
+    - Sensor Position: (2428.29137003348, 12.997519356122034)
+    - edge Node Position: (2119.1129465870445, 512.8062049170558)
+  Sensor 4: Total Latency = 2000.0000
+    - Communication Latency: 1000.0000
+    - Computing Latency: 1000.0000
+    - Sensor Position: (2871.6392166203436, 673.1890902252535)
+    - edge Node Position: (2119.1129465870445, 512.8062049170558)
+  Sensor 5: Total Latency = 2000.0000
+    - Communication Latency: 1000.0000
+    - Computing Latency: 1000.0000
+    - Sensor Position: (2421.384819823141, 1459.4635733876357)
+    - edge Node Position: (2119.1129465870445, 512.8062049170558)
+
+edge Node 2: 1 sensors assigned
+  Sensor 2: Total Latency = 1.4650
+    - Communication Latency: 0.0022
+    - Computing Latency: 1.4628
+    - Sensor Position: (79.60790905159088, 397.675301373297)
+    - edge Node Position: (193.44929710340617, 449.5890044418976)
+
+edge Node 0: 3 sensors assigned
+  Sensor 6: Total Latency = 1.3490
+    - Communication Latency: 0.0526
+    - Computing Latency: 1.2965
+    - Sensor Position: (2488.2139927589847, 1237.0395047284921)
+    - edge Node Position: (1498.2122545196262, 1052.2661901690717)
+  Sensor 8: Total Latency = 1.3286
+    - Communication Latency: 0.0321
+    - Computing Latency: 1.2965
+    - Sensor Position: (1907.0533327932005, 729.6643579401684)
+    - edge Node Position: (1498.2122545196262, 1052.2661901690717)
+  Sensor 9: Total Latency = 1.3387
+    - Communication Latency: 0.0423
+    - Computing Latency: 1.2965
+    - Sensor Position: (1944.1061557397807, 1218.2620113339765)
+    - edge Node Position: (1498.2122545196262, 1052.2661901690717)
+
+edge Node 1: 1 sensors assigned
+  Sensor 7: Total Latency = 0.2175
+    - Communication Latency: 0.0035
+    - Computing Latency: 0.2140
+    - Sensor Position: (683.6948269546406, 578.7759272042143)
+    - edge Node Position: (728.5543329477696, 237.13325269388258)
+
+=
+
+MODULE ASSIGNMENT SUMMARY:
+edge Node 5: 5 sensors assigned
+  - Sensor 0 at coordinates (1918.2803953736513, 50.021510445333874)
+  - Sensor 1 at coordinates (2676.538703114536, 173.8776652588323)
+  - Sensor 3 at coordinates (2428.29137003348, 12.997519356122034)
+  - Sensor 4 at coordinates (2871.6392166203436, 673.1890902252535)
+  - Sensor 5 at coordinates (2421.384819823141, 1459.4635733876357)
+edge Node 2: 1 sensors assigned
+  - Sensor 2 at coordinates (79.60790905159088, 397.675301373297)
+edge Node 0: 3 sensors assigned
+  - Sensor 6 at coordinates (2488.2139927589847, 1237.0395047284921)
+  - Sensor 8 at coordinates (1907.0533327932005, 729.6643579401684)
+  - Sensor 9 at coordinates (1944.1061557397807, 1218.2620113339765)
+edge Node 1: 1 sensors assigned
+  - Sensor 7 at coordinates (683.6948269546406, 578.7759272042143)

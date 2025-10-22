@@ -117,7 +117,7 @@ class PerformanceMetrics:
         """Setup logging to file for metrics tracking"""
         os.makedirs("logs", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = f"logs/metrics_{timestamp}.log"
+        log_file = f"logs/metrics_.log"
         
         # Create logger
         self.logger = logging.getLogger(f"MetricsCollector_{id(self)}")
@@ -162,7 +162,7 @@ class PerformanceMetrics:
         
         # Check if assignments are empty - generate synthetic workload if needed
         if not placement.module_assignments or all(len(sensors) == 0 for sensors in placement.module_assignments.values()):
-            self.logger.warning("⚠️  NO ASSIGNMENTS FOUND! Generating synthetic workload...")
+            self.logger.warning("[WARNING] NO ASSIGNMENTS FOUND! Generating synthetic workload...")
             self._generate_synthetic_workload(digital_twin, placement)
         
         # Count total assignments
@@ -269,20 +269,20 @@ class PerformanceMetrics:
         self.logger.info(f"\n{'='*80}")
         self.logger.info(f"METRICS SUMMARY FOR {algorithm_name}")
         self.logger.info(f"{'='*80}")
-        self.logger.info(f"📊 Task Tracking:")
+        self.logger.info(f"[TASK TRACKING]")
         self.logger.info(f"   - Tasks Generated: {self.tasks_generated}")
         self.logger.info(f"   - Tasks Completed: {self.tasks_completed}")
         self.logger.info(f"   - Completion Rate: {(self.tasks_completed/self.tasks_generated*100) if self.tasks_generated > 0 else 0:.2f}%")
-        self.logger.info(f"\n📈 Performance Metrics:")
+        self.logger.info(f"\n[PERFORMANCE METRICS]")
         self.logger.info(f"   - Overall Latency: {self.overall_latency:.4f} ms")
         self.logger.info(f"   - Communication Latency: {self.communication_latency:.4f} ms")
         self.logger.info(f"   - Computing Latency: {self.computing_latency:.4f} ms")
         self.logger.info(f"   - Energy Consumption: {self.energy_consumption:.4f} J")
         self.logger.info(f"   - Load Balance Score: {self.load_balance_score:.4f}")
-        self.logger.info(f"\n🔧 Per-Node Load Distribution:")
+        self.logger.info(f"\n[PER-NODE LOAD DISTRIBUTION]")
         for node_id, load in self.per_node_loads.items():
             self.logger.info(f"   - Node {node_id}: {load} tasks")
-        self.logger.info(f"\n⏱️  Per-Task Latency Values (first 10):")
+        self.logger.info(f"\n[PER-TASK LATENCY VALUES] (first 10):")
         for i, latency in enumerate(self.per_task_latencies[:10]):
             self.logger.info(f"   - Task {i+1}: {latency:.4f} ms")
         if len(self.per_task_latencies) > 10:
@@ -291,11 +291,11 @@ class PerformanceMetrics:
         
         # Validate metrics - throw error if still zero
         if self.overall_latency == 0 and total_assignments > 0:
-            raise ValueError(f"❌ METRIC ERROR: Overall latency is 0.00 but {total_assignments} assignments exist!")
+            raise ValueError(f"[ERROR] Overall latency is 0.00 but {total_assignments} assignments exist!")
         if self.energy_consumption == 0 and total_assignments > 0:
-            raise ValueError(f"❌ METRIC ERROR: Energy consumption is 0.00 but {total_assignments} assignments exist!")
+            raise ValueError(f"[ERROR] Energy consumption is 0.00 but {total_assignments} assignments exist!")
         if self.load_balance_score == 0 and len(placement.module_assignments) > 1:
-            raise ValueError(f"❌ METRIC ERROR: Load balance score is 0.00 but {len(placement.module_assignments)} nodes have assignments!")
+            raise ValueError(f"[ERROR] Load balance score is 0.00 but {len(placement.module_assignments)} nodes have assignments!")
         
         # Calculate statistical latency metrics
         if self.detailed_assignments:
@@ -396,7 +396,7 @@ DETAILED ASSIGNMENT ANALYSIS:
             placement.module_assignments[node_id].append(sensor)
             self.logger.debug(f"Synthetic: Assigned Sensor {sensor.device_id} -> Node {node_id}")
         
-        self.logger.warning(f"✓ Synthetic workload created: {len(digital_twin.sensors)} sensors distributed across {len(digital_twin.edge_nodes)} nodes")
+        self.logger.warning(f"[OK] Synthetic workload created: {len(digital_twin.sensors)} sensors distributed across {len(digital_twin.edge_nodes)} nodes")
     
     def get_summary_dict(self):
         """Get comprehensive metrics as dictionary"""
