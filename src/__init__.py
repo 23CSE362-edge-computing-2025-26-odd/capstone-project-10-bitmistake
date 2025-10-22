@@ -5,7 +5,7 @@ from .metrics import PerformanceMetrics, MetricsDefinitions
 from .olb_algorithm import OLBLatencyCalculator, OLBPlacement
 from .scenario_adapter import ScenarioToEnvironmentAdapter
 from .utils import SimulationConfig, create_placement_json, save_results
-from .visualization import SimulationVisualizer
+from .visualization import SimulationVisualizer, HospitalVisualizationEngine
 from .common_utils import (
     extract_sensor_id,
     calculate_euclidean_distance,
@@ -126,6 +126,7 @@ __all__ = [
     "create_placement_json",
     "save_results",
     "SimulationVisualizer",
+    "HospitalVisualizationEngine",
     "LBS",
     "LAB",
     "MEC",
