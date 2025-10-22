@@ -1,10 +1,7 @@
 import random
-import logging
 from typing import List, Tuple
 
 from .devices import CloudNodeDevice, EdgeNodeDevice, SensorDevice
-
-logger = logging.getLogger(__name__)
 
 
 class DigitalTwinEnvironment:
@@ -155,7 +152,7 @@ class DigitalTwinEnvironment:
         from .hospital_scenarios_extended import SensorConfig, HospitalScenario
         
         print(f"Converting scenario '{scenario.name}' to environment")
-        print(f"  Scenario has {len(scenario.sensors)} sensors, {scenario.fog_node_count} fog nodes")
+        print(f"  Scenario has {len(scenario.sensors)} sensors, {scenario.fog_nodes} fog nodes")
         
         # Create environment
         environment = cls(width=environment_width, height=environment_height)
@@ -193,7 +190,7 @@ class DigitalTwinEnvironment:
                 sensor = DigitalTwinEnvironment._config_to_sensor_device(config)
                 sensors.append(sensor)
             except Exception as e:
-                logger.warning(f"Failed to convert sensor {config.sensor_id}: {e}")
+                print(f"Warning: Failed to convert sensor {config.sensor_id}: {e}")
         
         return sensors
     
@@ -212,10 +209,20 @@ class DigitalTwinEnvironment:
         # Map criticality to transmission power
         transmission_power = DigitalTwinEnvironment._map_criticality_to_power(config.criticality)
         
+        # Generate coordinates if not provided
+        coordinates = config.coordinates
+        if coordinates is None:
+            # Generate random coordinates within environment bounds
+            # Use sensor_id hash for reproducibility
+            import hashlib
+            seed_value = int(hashlib.md5(str(config.sensor_id).encode()).hexdigest(), 16) % (2**32)
+            rng = random.Random(seed_value)
+            coordinates = (rng.uniform(0, 3000), rng.uniform(0, 2000))
+        
         # Create sensor device
         sensor = SensorDevice(
             device_id=config.sensor_id,
-            coordinates=config.coordinates,
+            coordinates=coordinates,
             transmission_power=transmission_power,
             average_flow_rate=flow_rate,
             flow_traffic_size=traffic_size,
@@ -284,7 +291,7 @@ class DigitalTwinEnvironment:
             environment: DigitalTwinEnvironment to populate
             scenario: HospitalScenario defining requirements
         """
-        num_fog_nodes = scenario.fog_node_count
+        num_fog_nodes = scenario.fog_nodes
         
         # Get sensor locations to inform fog node placement
         sensor_locations = [s.coordinates for s in environment.sensors]

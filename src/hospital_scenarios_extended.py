@@ -17,6 +17,7 @@ class SensorConfig:
     criticality: str  # critical, important, routine
     data_size_bytes: int
     frequency_hz: float
+    coordinates: Optional[tuple] = None  # (x, y) coordinates - generated if None
 
 
 class HospitalScenario:
@@ -265,3 +266,4 @@ class ScenarioManager:
             print(f"  Sensor Types: {info['sensor_types']}")
             print(f"  Avg Data Size: {info['avg_data_size']:.0f} bytes")
             print(f"  Avg Frequency: {info['avg_frequency']:.2f} Hz")
+
