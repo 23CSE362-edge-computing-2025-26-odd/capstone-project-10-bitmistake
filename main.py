@@ -11,10 +11,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "Workload"))
 
 # --- SRC IMPORTS ---
 from src.comparison_algorithms import (
-    DistancePlacement,
-    FNPAPlacement,
-    LoadBalancedPlacement,
-    RandomPlacement,
+    LAB,
+    FNPA,
+    MEC,
+    LBS,
 )
 from src import (
     DigitalTwinEnvironment,
@@ -27,15 +27,20 @@ from src import (
     save_results,
 )
 
-# --- CI MODEL IMPORT ---
-from Workload.predict import WorkloadPredictor
+# --- CI MODEL IMPORT (OPTIONAL) ---
+try:
+    from Workload.predict import WorkloadPredictor
+    WORKLOAD_PREDICTOR_AVAILABLE = True
+except ImportError:
+    WORKLOAD_PREDICTOR_AVAILABLE = False
+    # Will log warning later when logger is initialized
 
 # --- ALGORITHMS FOR EXPERIMENT COMPARISON ---
 algorithms = [
-    ("RandomPlacement", RandomPlacement),
-    ("DistancePlacement", DistancePlacement),
-    ("LoadBalancedPlacement", LoadBalancedPlacement),
-    ("FNPAPlacement", FNPAPlacement),
+    ("LBS", LBS),
+    ("LAB", LAB),
+    ("MEC", MEC),
+    ("FNPA", FNPA),
 ]
 
 # --- LOGGING CONFIGURATION ---
@@ -45,6 +50,10 @@ logging.basicConfig(
     handlers=[logging.FileHandler("logs/olb_simulation.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
+
+# Log model availability status
+if not WORKLOAD_PREDICTOR_AVAILABLE:
+    logger.warning("WorkloadPredictor not available - will skip LSTM predictions")
 
 
 def main():
@@ -64,41 +73,66 @@ def main():
         num_fog_nodes=config.num_fog_nodes, seed=config.random_seed
     )
 
-    logger.info("Running CI Model (LSTM Workload Predictor)...")
-    ci_model = WorkloadPredictor(model_dir="CI_Models/Workload/models")
+    # --- OPTIONAL: RUN CI MODEL (LSTM WORKLOAD PREDICTOR) ---
     workload_predictions = {}
-
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    def predict_single_node(node_index):
-        node_name = f"system-{node_index+1}"
+    
+    if WORKLOAD_PREDICTOR_AVAILABLE:
+        logger.info("=" * 70)
+        logger.info("Running CI Model (LSTM Workload Predictor)...")
+        logger.info("=" * 70)
+        
         try:
-            result = ci_model.predict_future(node_name, future_steps=200, plot=False, save_plot=False)
-            return node_name, result["stats"]
+            ci_model = WorkloadPredictor(model_dir="CI_Models/Workload/models")
+            
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            def predict_single_node(node_index):
+                node_name = f"system-{node_index+1}"
+                try:
+                    result = ci_model.predict_future(node_name, future_steps=200, plot=False, save_plot=False)
+                    return node_name, result["stats"]
+                except Exception as e:
+                    logger.warning(f"Workload prediction failed for {node_name}: {e}")
+                    return node_name, None
+
+            with ThreadPoolExecutor(max_workers=min(6, len(environment.fog_nodes))) as executor:
+                futures = [executor.submit(predict_single_node, i) for i in range(len(environment.fog_nodes))]
+                for future in as_completed(futures):
+                    node_name, stats = future.result()
+                    if stats:
+                        workload_predictions[node_name] = stats
+                        logger.info(f"✓ Predicted workload for {node_name}: {stats}")
+            
+            logger.info(f"✓ LSTM predictions completed for {len(workload_predictions)} nodes")
+            
         except Exception as e:
-            logger.warning(f"Workload prediction failed for {node_name}: {e}")
-            return node_name, None
+            logger.warning(f"LSTM model initialization failed: {e}")
+            logger.info("Continuing without workload predictions (using default capacities)")
+            workload_predictions = {}
+    else:
+        logger.info("=" * 70)
+        logger.info("SKIPPING CI Model - WorkloadPredictor not available")
+        logger.info("Using default fog node capacities without LSTM predictions")
+        logger.info("=" * 70)
 
-    with ThreadPoolExecutor(max_workers=min(6, len(environment.fog_nodes))) as executor:
-        futures = [executor.submit(predict_single_node, i) for i in range(len(environment.fog_nodes))]
-        for future in as_completed(futures):
-            node_name, stats = future.result()
-            if stats:
-                workload_predictions[node_name] = stats
-                logger.info(f"Predicted workload for {node_name}: {stats}")
-
-    # --- ADJUST FOG NODE CAPACITIES BASED ON PREDICTED WORKLOAD ---
-    logger.info("Adjusting fog node capacities based on predicted workloads...")
-    for i, fog_node in enumerate(environment.fog_nodes):
-        node_name = f"system-{i+1}"
-        if node_name in workload_predictions:
-            predicted_load = workload_predictions[node_name]["predicted_avg"]
-            adjustment_factor = max(0.5, 1.0 - (predicted_load / 100.0))
-            fog_node.processingPower *= adjustment_factor
-            logger.info(
-                f"FogNode {i} adjusted: Power={fog_node.processingPower:.2f}, "
-                f"AdjFactor={adjustment_factor:.2f}"
-            )
+    # --- ADJUST FOG NODE CAPACITIES BASED ON PREDICTED WORKLOAD (IF AVAILABLE) ---
+    if workload_predictions:
+        logger.info("Adjusting fog node capacities based on predicted workloads...")
+        for i, fog_node in enumerate(environment.fog_nodes):
+            node_name = f"system-{i+1}"
+            if node_name in workload_predictions:
+                predicted_load = workload_predictions[node_name]["predicted_avg"]
+                adjustment_factor = max(0.5, 1.0 - (predicted_load / 100.0))
+                fog_node.processingPower *= adjustment_factor
+                logger.info(
+                    f"  FogNode {i} adjusted: Power={fog_node.processingPower:.2f}, "
+                    f"AdjFactor={adjustment_factor:.2f}"
+                )
+        logger.info("✓ Fog node capacity adjustments completed")
+    else:
+        logger.info("Using default fog node capacities (no adjustments)")
+        for i, fog_node in enumerate(environment.fog_nodes):
+            logger.info(f"  FogNode {i}: Power={fog_node.processingPower:.2f} (default)")
 
     # --- SETUP YAFS APPLICATION AND TOPOLOGY ---
     logger.info("Setting up YAFS application and topology...")
@@ -174,7 +208,7 @@ def run_experiments(placement_json, config):
     from yafs.population import Population
 
     for algo_name, AlgoClass in algorithms:
-        print(f"\n==== Running {algo_name} ====\n")
+        print(f"\n= Running {algo_name} =\n")
 
         environment = DigitalTwinEnvironment(
             width=config.environment_width, height=config.environment_height
@@ -214,7 +248,7 @@ def run_experiments(placement_json, config):
 
         save_results(metrics, placement, f"reports/{algo_name.lower()}_report.txt")
 
-        print(f"==== Finished {algo_name}, results saved to {results_filename} ====\n")
+        print(f"= Finished {algo_name}, results saved to {results_filename} =\n")
 
 
 if __name__ == "__main__":

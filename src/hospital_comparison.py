@@ -1,6 +1,6 @@
 """
 Hospital Scenario Comparison Framework
-Compares 6 algorithms across 3 hospital scenarios with comprehensive metrics
+Compares algorithms across 3 hospital scenarios with comprehensive metrics
 """
 
 import json
@@ -10,6 +10,12 @@ import logging
 from typing import Dict, List, Any
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
+
+# Check if predictive algorithms are available
+try:
+    from . import PREDICTIVE_AVAILABLE
+except ImportError:
+    PREDICTIVE_AVAILABLE = False
 
 
 @dataclass
@@ -69,7 +75,16 @@ class HospitalComparisonRunner:
     """Orchestrates comparison of algorithms across hospital scenarios"""
     
     def __init__(self, logger=None):
-        self.algorithms = ["OLB", "LBS", "LAB", "MEC", "FNPA", "Predictive"]
+        # Base algorithms always available
+        self.algorithms = ["OLB", "LBS", "LAB", "MEC", "FNPA"]
+        
+        # Add Predictive only if available
+        if PREDICTIVE_AVAILABLE:
+            self.algorithms.append("Predictive")
+        else:
+            if logger:
+                logger.info("[INFO] Predictive algorithm unavailable - skipping from comparison")
+        
         self.scenarios = ["ICU Monitoring", "Patient Wards", "Remote Patient Monitoring"]
         self.iterations = 3
         self.logger = logger or self._create_logger()
