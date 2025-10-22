@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from src import (
     DigitalTwinEnvironment,
     OLBPlacement,
-    PredictiveLatencyPlacement,
     LBS,
     LAB,
     MEC,
@@ -23,9 +22,16 @@ from src import (
     create_smart_healthcare_application,
     create_yafs_topology,
     PerformanceMetrics,
-    SimulationVisualizer
+    SimulationVisualizer,
+    PREDICTIVE_AVAILABLE
 )
 from src.orchestrator import setup_directories
+
+# Import PredictiveLatencyPlacement only if available
+if PREDICTIVE_AVAILABLE:
+    from src import PredictiveLatencyPlacement
+else:
+    PredictiveLatencyPlacement = None
 
 app = Flask(__name__)
 CORS(app)
@@ -72,11 +78,21 @@ def simulate():
             }), 400
         
         # Validate algorithm
-        valid_algorithms = ['predictive', 'olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+        valid_algorithms = ['olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+        if PREDICTIVE_AVAILABLE:
+            valid_algorithms.append('predictive')
+        
         if algorithm not in valid_algorithms:
             return jsonify({
                 'success': False,
                 'error': f'Invalid algorithm. Must be one of: {", ".join(valid_algorithms)}'
+            }), 400
+        
+        # Check if predictive is requested but not available
+        if algorithm == 'predictive' and not PREDICTIVE_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'Predictive algorithm is not available. Please install required dependencies.'
             }), 400
         
         print(f"[INFO] Starting simulation: {num_sensors} sensors, {num_fog_nodes} fog nodes, {algorithm}")
@@ -98,6 +114,11 @@ def simulate():
         
         # Select the appropriate placement algorithm
         if algorithm == 'predictive':
+            if not PREDICTIVE_AVAILABLE or PredictiveLatencyPlacement is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Predictive algorithm is not available'
+                }), 400
             placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
         elif algorithm == 'olb':
             placement = OLBPlacement("OLB", placement_json, environment)
@@ -215,12 +236,22 @@ def compare_algorithms():
                 'error': 'Must specify at least one algorithm to compare'
             }), 400
         
-        valid_algorithms = ['olb', 'predictive', 'random', 'distance', 'loadbalanced', 'fnpa']
+        valid_algorithms = ['olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+        if PREDICTIVE_AVAILABLE:
+            valid_algorithms.append('predictive')
+        
         invalid_algos = [a for a in algorithms_to_compare if a not in valid_algorithms]
         if invalid_algos:
             return jsonify({
                 'success': False,
                 'error': f'Invalid algorithms: {", ".join(invalid_algos)}'
+            }), 400
+        
+        # Check if predictive is requested but not available
+        if 'predictive' in algorithms_to_compare and not PREDICTIVE_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'Predictive algorithm is not available. Please install required dependencies.'
             }), 400
         
         print(f"[INFO] Starting comparison with {num_sensors} sensors and {num_fog_nodes} fog nodes")
@@ -256,6 +287,9 @@ def compare_algorithms():
             # Select algorithm
             print(f"[DEBUG] Creating placement algorithm: {algorithm}")
             if algorithm == 'predictive':
+                if not PREDICTIVE_AVAILABLE or PredictiveLatencyPlacement is None:
+                    print(f"[ERROR] Predictive algorithm not available")
+                    continue
                 placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
             elif algorithm == 'olb':
                 placement = OLBPlacement("OLB", placement_json, environment)
@@ -523,12 +557,17 @@ def generate_chart():
 
 @app.route('/api/environment-info')
 def environment_info():
+    algorithms = ['olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+    if PREDICTIVE_AVAILABLE:
+        algorithms.insert(1, 'predictive')  # Insert after 'olb'
+    
     return jsonify({
         'defaultSensors': 10,
         'defaultFogNodes': 4,
         'maxSensors': 30,
         'maxFogNodes': 10,
-        'algorithms': ['olb', 'predictive', 'random', 'distance', 'loadbalanced', 'fnpa']
+        'algorithms': algorithms,
+        'predictiveAvailable': PREDICTIVE_AVAILABLE
     })
 
 @app.route('/api/test-algorithms', methods=['GET'])
