@@ -10,7 +10,6 @@ try:
 except ImportError:
     PREDICTIVE_AVAILABLE = False
 
-# Import necessary components for real simulation
 from .environment import DigitalTwinEnvironment
 from .hospital_scenarios_extended import ScenarioManager
 from .yafs_integration import create_smart_healthcare_application, create_yafs_topology

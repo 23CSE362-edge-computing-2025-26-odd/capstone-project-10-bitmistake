@@ -2,12 +2,19 @@ import math
 from typing import Tuple, Optional, Dict, List
 
 
-def extract_sensor_id(module_name: str) -> int:
-
+def extract_sensor_id(module_name: str):
+    """
+    Extract sensor ID from module name.
+    Handles both numeric IDs (0, 1, 2) and string IDs (ICU-0, REMOTE-5).
+    Returns int for numeric IDs, str for prefixed IDs.
+    """
     parts = module_name.split("_")
     for part in reversed(parts):
         if part.isdigit():
             return int(part)
+        # Check if it's a hyphenated ID like "ICU-0" or "REMOTE-5"
+        if "-" in part:
+            return part
     return 0
 
 
