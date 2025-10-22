@@ -270,6 +270,8 @@ class MEC(Placement):
         self.node_energy_consumption: Dict[int, float] = {
             i: 0.0 for i in range(len(digital_twin.edge_nodes))
         }
+        # Track how many assignments fell back to cloud
+        self.cloud_assignments = 0
     
     def initial_allocation(self, sim, app_name: str):
         """Deploy modules using multi-edge coordination"""
@@ -292,28 +294,40 @@ class MEC(Placement):
                 # Find optimal node considering latency and energy
                 optimal_node_id, latency_cost, energy_cost = self._find_optimal_edge(sensor)
 
+                # If an optimal edge was found, deploy there; otherwise fallback to cloud
                 if optimal_node_id is not None:
                     node_name = f"edge_{optimal_node_id}"
-                sim.deploy_module(app_name, module_name, [], [node_name])
+                    sim.deploy_module(app_name, module_name, [], [node_name])
 
-                # Track assignment
-                if optimal_node_id not in self.module_assignments:
-                    self.module_assignments[optimal_node_id] = []
-                self.module_assignments[optimal_node_id].append(sensor)
-                
-                # Update resource tracking
-                self.node_loads[optimal_node_id] += 1
-                self.node_energy_consumption[optimal_node_id] += energy_cost
-                total_energy += energy_cost
-                
-                placement_count += 1
-                print(f"  [MEC] Sensor {sensor_id} -> edge_{optimal_node_id} "
-                      f"(latency: {latency_cost:.2f}ms, energy: {energy_cost:.2f}J)")
+                    # Track assignment
+                    if optimal_node_id not in self.module_assignments:
+                        self.module_assignments[optimal_node_id] = []
+                    self.module_assignments[optimal_node_id].append(sensor)
+
+                    # Update resource tracking (guard energy_cost)
+                    self.node_loads[optimal_node_id] += 1
+                    self.node_energy_consumption[optimal_node_id] += (energy_cost if energy_cost is not None else 0.0)
+                    total_energy += (energy_cost if energy_cost is not None else 0.0)
+
+                    placement_count += 1
+                    print(f"  [MEC] Sensor {sensor_id} -> edge_{optimal_node_id} "
+                          f"(latency: {latency_cost:.2f}ms, energy: {(energy_cost if energy_cost is not None else 0.0):.2f}J)")
+                else:
+                    # No suitable edge found -> deploy to cloud
+                    node_name = "cloud"
+                    sim.deploy_module(app_name, module_name, [], [node_name])
+                    self.cloud_assignments += 1
+                    # No energy accounted for cloud fallback in MEC (set 0)
+                    total_energy += 0.0
+                    placement_count += 1
+                    print(f"  [MEC] Sensor {sensor_id} -> CLOUD (no suitable edge)")
         
         avg_energy = total_energy / placement_count if placement_count > 0 else 0
         print(f"\n[MEC] Placement Complete: {placement_count} modules placed")
         print(f"[MEC] Total Energy Consumption: {total_energy:.2f}J")
         print(f"[MEC] Average Energy per Task: {avg_energy:.2f}J")
+        if self.cloud_assignments > 0:
+            print(f"[MEC] Cloud fallbacks: {self.cloud_assignments}")
         self._print_edge_coordination_status()
         print(f"{'='*70}\n")
     
@@ -443,41 +457,47 @@ class FNPA(Placement):
         for module_name in modules_to_place:
             sensor_id = extract_sensor_id(module_name)
             sensor = self.sensor_lookup.find_by_id(sensor_id)
-
             if sensor:
                 # Try to find suitable edge node
                 optimal_node_id = self._find_suitable_edge_node(sensor)
-                
+
                 if optimal_node_id is not None:
                     # Assign to edge node
                     node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
-                    
+
                     if optimal_node_id not in self.module_assignments:
                         self.module_assignments[optimal_node_id] = []
                     self.module_assignments[optimal_node_id].append(sensor)
-                    
+
                     # Update resource tracking (normalize by capacity)
                     workload = sensor.averageFlowSize * sensor.averageFlowRate
                     self.node_loads[optimal_node_id] += workload / self.node_capacities[optimal_node_id]
-                    
+
                     bandwidth_demand = sensor.flowTrafficSize * sensor.averageFlowRate
                     edge_node = self.digital_twin.edge_nodes[optimal_node_id]
-                    self.node_bandwidth_usage[optimal_node_id] += bandwidth_demand / edge_node.bandwidth
-                    
+                    # Guard bandwidth division
+                    self.node_bandwidth_usage[optimal_node_id] += (bandwidth_demand / edge_node.bandwidth) if edge_node.bandwidth > 0 else 0.0
+
                     edge_count += 1
                     utilization = (self.node_loads[optimal_node_id] * 100)
-                    
+
                     print(f"  [FNPA] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(util: {utilization:.1f}%)")
+                else:
+                    # No suitable edge -> deploy to cloud
+                    node_name = "cloud"
+                    sim.deploy_module(app_name, module_name, [], [node_name])
+                    self.cloud_assignments += 1
+                    cloud_count += 1
+                    print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (no suitable edge)")
             else:
-                # Fallback to cloud
+                # Fallback to cloud when sensor missing or invalid
                 node_name = "cloud"
                 sim.deploy_module(app_name, module_name, [], [node_name])
                 self.cloud_assignments += 1
                 cloud_count += 1
-                
-                print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (edge nodes saturated)")
+                print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (sensor missing)")
             
             placement_count += 1
         
