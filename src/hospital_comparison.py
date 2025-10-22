@@ -127,7 +127,7 @@ class HospitalComparisonRunner:
         
         total_runs = 0
         
-        # Run comparisons
+        # Run comparisons with error handling
         for scenario_idx, scenario_name in enumerate(self.scenarios):
             print(f"\n[SCENARIO {scenario_idx + 1}/{len(self.scenarios)}] {scenario_name}")
             print("=" * 70)
@@ -142,17 +142,23 @@ class HospitalComparisonRunner:
                 print(f"\nTesting: {algorithm}")
                 
                 for iteration in range(self.iterations):
-                    # Run REAL simulation
-                    metric = self._run_real_simulation(algorithm, scenario, iteration)
-                    
-                    if metric:
-                        self.metrics.append(metric)
-                        print(f"  [OK] Iteration {iteration + 1}/{self.iterations} "
-                              f"(latency: {metric.latency_avg:.2f}ms, "
-                              f"energy: {metric.energy_consumption:.2f}J)")
-                        total_runs += 1
-                    else:
-                        print(f"  [FAIL] Iteration {iteration + 1}/{self.iterations} failed")
+                    try:
+                        # Run REAL simulation
+                        metric = self._run_real_simulation(algorithm, scenario, iteration)
+                        
+                        if metric:
+                            self.metrics.append(metric)
+                            print(f"  [OK] Iteration {iteration + 1}/{self.iterations} "
+                                  f"(latency: {metric.latency_avg:.2f}ms, "
+                                  f"energy: {metric.energy_consumption:.2f}J)")
+                            total_runs += 1
+                        else:
+                            print(f"  [FAIL] Iteration {iteration + 1}/{self.iterations} failed")
+                    except Exception as e:
+                        print(f"  [ERROR] Iteration {iteration + 1}/{self.iterations} crashed: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Continue with next iteration instead of crashing entire comparison
         
         # Calculate statistics
         duration = time.time() - self.start_time
