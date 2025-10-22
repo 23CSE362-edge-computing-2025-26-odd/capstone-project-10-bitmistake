@@ -241,22 +241,22 @@ class HospitalComparisonRunner:
                     memory_utilization_percent=summary.get("memory_utilization", 0.0)
                 )
                 
-                    return metric
+                return metric
 
-                except ImportError as e:
-                    print(f"ERROR: YAFS not available: {e}")
-                    return None
-                except Exception as e:
-                    print(f"ERROR: Simulation failed: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    return None
-
+            except ImportError as e:
+                print(f"ERROR: YAFS not available: {e}")
+                return None
             except Exception as e:
-                print(f"ERROR: Failed to run simulation for {algorithm_name}/{scenario.name}: {e}")
+                print(f"ERROR: Simulation failed: {e}")
                 import traceback
                 traceback.print_exc()
                 return None
+        
+        except Exception as e:
+            print(f"ERROR: Failed to run simulation for {algorithm_name}/{scenario.name}: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def _get_placement_class(self, algorithm_name: str):
         """Get placement algorithm class by name"""

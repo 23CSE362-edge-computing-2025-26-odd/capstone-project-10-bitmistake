@@ -264,19 +264,19 @@ class MEC(Placement):
                     node_name = f"edge_{optimal_node_id}"
                 sim.deploy_module(app_name, module_name, [], [node_name])
 
-                    # Track assignment
-                    if optimal_node_id not in self.module_assignments:
-                        self.module_assignments[optimal_node_id] = []
-                    self.module_assignments[optimal_node_id].append(sensor)
-                    
-                    # Update resource tracking
-                    self.node_loads[optimal_node_id] += 1
-                    self.node_energy_consumption[optimal_node_id] += energy_cost
-                    total_energy += energy_cost
-                    
-                    placement_count += 1
-                    print(f"  [MEC] Sensor {sensor_id} -> edge_{optimal_node_id} "
-                          f"(latency: {latency_cost:.2f}ms, energy: {energy_cost:.2f}J)")
+                # Track assignment
+                if optimal_node_id not in self.module_assignments:
+                    self.module_assignments[optimal_node_id] = []
+                self.module_assignments[optimal_node_id].append(sensor)
+                
+                # Update resource tracking
+                self.node_loads[optimal_node_id] += 1
+                self.node_energy_consumption[optimal_node_id] += energy_cost
+                total_energy += energy_cost
+                
+                placement_count += 1
+                print(f"  [MEC] Sensor {sensor_id} -> edge_{optimal_node_id} "
+                      f"(latency: {latency_cost:.2f}ms, energy: {energy_cost:.2f}J)")
         
         avg_energy = total_energy / placement_count if placement_count > 0 else 0
         print(f"\n[MEC] Placement Complete: {placement_count} modules placed")
@@ -440,15 +440,15 @@ class FNPA(Placement):
                     print(f"  [FNPA] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(util: {utilization:.1f}%)")
             else:
-                    # Fallback to cloud
-                    node_name = "cloud"
-                    sim.deploy_module(app_name, module_name, [], [node_name])
-                    self.cloud_assignments += 1
-                    cloud_count += 1
-                    
-                    print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (edge nodes saturated)")
+                # Fallback to cloud
+                node_name = "cloud"
+                sim.deploy_module(app_name, module_name, [], [node_name])
+                self.cloud_assignments += 1
+                cloud_count += 1
                 
-                placement_count += 1
+                print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (edge nodes saturated)")
+            
+            placement_count += 1
         
         print(f"\n[FNPA] Placement Complete: {placement_count} modules placed")
         print(f"[FNPA] edge Placements: {edge_count}, Cloud Fallbacks: {cloud_count}")
