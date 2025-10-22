@@ -8,7 +8,6 @@ from io import BytesIO
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -42,9 +41,42 @@ def simulate():
     try:
         data = request.json
         
+        # Input validation
         num_sensors = data.get('numSensors', 10)
         num_fog_nodes = data.get('numFogNodes', 4)
         algorithm = data.get('algorithm', 'reactive')
+        
+        # Validate sensor count
+        if not isinstance(num_sensors, int) or num_sensors < 1:
+            return jsonify({
+                'success': False,
+                'error': 'Number of sensors must be a positive integer'
+            }), 400
+        if num_sensors > 100:
+            return jsonify({
+                'success': False,
+                'error': 'Number of sensors cannot exceed 100'
+            }), 400
+        
+        # Validate fog node count
+        if not isinstance(num_fog_nodes, int) or num_fog_nodes < 1:
+            return jsonify({
+                'success': False,
+                'error': 'Number of fog nodes must be a positive integer'
+            }), 400
+        if num_fog_nodes > 20:
+            return jsonify({
+                'success': False,
+                'error': 'Number of fog nodes cannot exceed 20'
+            }), 400
+        
+        # Validate algorithm
+        valid_algorithms = ['predictive', 'olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+        if algorithm not in valid_algorithms:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid algorithm. Must be one of: {", ".join(valid_algorithms)}'
+            }), 400
         
         print(f"[INFO] Starting simulation: {num_sensors} sensors, {num_fog_nodes} fog nodes, {algorithm}")
         
@@ -165,6 +197,33 @@ def compare_algorithms():
         num_fog_nodes = data.get('numFogNodes', 4)
         algorithms_to_compare = data.get('algorithms', ['olb', 'predictive', 'random', 'distance'])
         
+        # Input validation
+        if not isinstance(num_sensors, int) or num_sensors < 1 or num_sensors > 100:
+            return jsonify({
+                'success': False,
+                'error': 'Number of sensors must be between 1 and 100'
+            }), 400
+        
+        if not isinstance(num_fog_nodes, int) or num_fog_nodes < 1 or num_fog_nodes > 20:
+            return jsonify({
+                'success': False,
+                'error': 'Number of fog nodes must be between 1 and 20'
+            }), 400
+        
+        if not isinstance(algorithms_to_compare, list) or len(algorithms_to_compare) < 1:
+            return jsonify({
+                'success': False,
+                'error': 'Must specify at least one algorithm to compare'
+            }), 400
+        
+        valid_algorithms = ['olb', 'predictive', 'random', 'distance', 'loadbalanced', 'fnpa']
+        invalid_algos = [a for a in algorithms_to_compare if a not in valid_algorithms]
+        if invalid_algos:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid algorithms: {", ".join(invalid_algos)}'
+            }), 400
+        
         print(f"[INFO] Starting comparison with {num_sensors} sensors and {num_fog_nodes} fog nodes")
         print(f"[INFO] Comparing algorithms: {algorithms_to_compare}")
         
@@ -280,17 +339,13 @@ def compare_algorithms():
                             'fogId': fog_id
                         })
             
-            # If no assignments found, try to infer from the placement
+            # If no assignments found, return error instead of creating fake data
             if not assignments:
-                print(f"[WARNING] No assignments found for {algorithm}, trying to infer...")
-                # Create dummy assignments for visualization
-                sensors_per_fog = len(environment.sensors) // len(environment.fog_nodes)
-                for i, sensor in enumerate(environment.sensors):
-                    fog_idx = min(i // max(1, sensors_per_fog), len(environment.fog_nodes) - 1)
-                    assignments.append({
-                        'sensorId': sensor.device_id,
-                        'fogId': environment.fog_nodes[fog_idx].node_id
-                    })
+                print(f"[ERROR] No assignments found for {algorithm} - placement may have failed")
+                result['error'] = f"No placement assignments generated for {algorithm}"
+                result['assignments_available'] = False
+            else:
+                result['assignments_available'] = True
             
             print(f"[DEBUG] Total assignments for {algorithm}: {len(assignments)}")
             
