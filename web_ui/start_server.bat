@@ -1,5 +1,5 @@
 @echo off
-echo Starting Predictive Fog Placement Web UI...
+echo Starting Predictive edge Placement Web UI...
 echo.
 
 call conda activate tensorflow_gpu_env

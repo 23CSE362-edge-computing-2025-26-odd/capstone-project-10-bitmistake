@@ -23,15 +23,15 @@ class SimulationVisualizer:
 
         plt.figure(figsize=(12, 8))
 
-        # Plot fog nodes
-        for i, fog_node in enumerate(digital_twin.fog_nodes):
+        # Plot edge nodes
+        for i, edge_node in enumerate(digital_twin.edge_nodes):
             plt.scatter(
-                fog_node.coordinates[0],
-                fog_node.coordinates[1],
+                edge_node.coordinates[0],
+                edge_node.coordinates[1],
                 c=self.colors[i % len(self.colors)],
                 s=200,
                 marker="s",
-                label=f"Fog Node {i}",
+                label=f"edge Node {i}",
                 alpha=0.7,
                 edgecolors="black",
             )
@@ -48,10 +48,10 @@ class SimulationVisualizer:
                     alpha=0.8,
                 )
                 # Draw connection line
-                fog_node = digital_twin.fog_nodes[node_id]
+                edge_node = digital_twin.edge_nodes[node_id]
                 plt.plot(
-                    [sensor.coordinates[0], fog_node.coordinates[0]],
-                    [sensor.coordinates[1], fog_node.coordinates[1]],
+                    [sensor.coordinates[0], edge_node.coordinates[0]],
+                    [sensor.coordinates[1], edge_node.coordinates[1]],
                     c=self.colors[node_id % len(self.colors)],
                     alpha=0.3,
                     linewidth=1,
@@ -59,7 +59,7 @@ class SimulationVisualizer:
 
         plt.xlabel("X Coordinate (units)")
         plt.ylabel("Y Coordinate (units)")
-        plt.title(f"{algorithm_name} Algorithm - Sensor-Fog Node Assignments")
+        plt.title(f"{algorithm_name} Algorithm - Sensor-edge Node Assignments")
         plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
@@ -74,9 +74,9 @@ class SimulationVisualizer:
         # Define clean labels mapping
         label_mapping = {
             "OLB": "OLB",
-            "LBS": "Random",
-            "LAB": "Distance",
-            "MEC": "LoadBalanced",
+            "LBS": "Location-Based",
+            "LAB": "Load-Aware",
+            "MEC": "Multi-Edge",
             "FNPA": "FNPA",
         }
 

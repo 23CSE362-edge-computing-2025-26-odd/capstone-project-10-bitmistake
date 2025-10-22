@@ -1,7 +1,7 @@
 class ActuatorDevice:
     """
     Tier 1 - IoT Layer Entity representing an actuator device
-    Actuators receive processed data or commands from Fog/Cloud nodes
+    Actuators receive processed data or commands from edge/Cloud nodes
     Examples: insulin pump, alarm, display unit
     """
 
@@ -18,7 +18,7 @@ class ActuatorDevice:
         )
 
     def receive_command(self, command):
-        """Receive a command from fog/cloud node"""
+        """Receive a command from edge/cloud node"""
         self.received_commands.append(command)
         print(f"[ACTION] Actuator {self.actuator_id} executed command: {command}")
 
@@ -61,9 +61,9 @@ class SensorDevice:
         return self.__str__()
 
 
-class FogNodeDevice:
+class EdgeNodeDevice:
     """
-    Tier 2 - Fog Layer Entity representing fog computing nodes
+    Tier 2 - edge Layer Entity representing edge computing nodes
     Contains all attributes required by OLB equations
     """
 
@@ -84,22 +84,22 @@ class FogNodeDevice:
         self.noisePower = noise_power  # σ^2 in Watts
         self.assigned_modules = []  # Track assigned processing modules
         print(
-            f"[INFO] FogNode {node_id} created at {coordinates} with {processing_power} MIPS and BW {bandwidth} MHz"
+            f"[INFO] edgeNode {node_id} created at {coordinates} with {processing_power} MIPS and BW {bandwidth} MHz"
         )
 
-    # Note: Each fog node will store assigned modules in self.assigned_modules
+    # Note: Each edge node will store assigned modules in self.assigned_modules
 
     def __str__(self):
-        return f"FogNode_{self.node_id} at {self.coordinates}"
+        return f"edgeNode_{self.node_id} at {self.coordinates}"
 
     def __repr__(self):
         return self.__str__()
 
 
-class CloudNodeDevice(FogNodeDevice):
+class CloudNodeDevice(EdgeNodeDevice):
     """
     Tier 3 - Cloud Layer Entity representing the cloud data center
-    Inherits FogNodeDevice but enforces large compute and bandwidth capacity.
+    Inherits EdgeNodeDevice but enforces large compute and bandwidth capacity.
     Treated as a single centralized node.
     """
 

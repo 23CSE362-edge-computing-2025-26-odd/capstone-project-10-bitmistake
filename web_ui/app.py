@@ -50,7 +50,7 @@ def simulate():
         
         # Input validation
         num_sensors = data.get('numSensors', 10)
-        num_fog_nodes = data.get('numFogNodes', 4)
+        num_edge_nodes = data.get('numedgeNodes', 4)
         algorithm = data.get('algorithm', 'reactive')
         
         # Validate sensor count
@@ -65,20 +65,20 @@ def simulate():
                 'error': 'Number of sensors cannot exceed 100'
             }), 400
         
-        # Validate fog node count
-        if not isinstance(num_fog_nodes, int) or num_fog_nodes < 1:
+        # Validate edge node count
+        if not isinstance(num_edge_nodes, int) or num_edge_nodes < 1:
             return jsonify({
                 'success': False,
-                'error': 'Number of fog nodes must be a positive integer'
+                'error': 'Number of edge nodes must be a positive integer'
             }), 400
-        if num_fog_nodes > 20:
+        if num_edge_nodes > 20:
             return jsonify({
                 'success': False,
-                'error': 'Number of fog nodes cannot exceed 20'
+                'error': 'Number of edge nodes cannot exceed 20'
             }), 400
         
         # Validate algorithm
-        valid_algorithms = ['olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+        valid_algorithms = ['olb', 'lbs', 'lab', 'mec', 'fnpa']
         if PREDICTIVE_AVAILABLE:
             valid_algorithms.append('predictive')
         
@@ -95,14 +95,14 @@ def simulate():
                 'error': 'Predictive algorithm is not available. Please install required dependencies.'
             }), 400
         
-        print(f"[INFO] Starting simulation: {num_sensors} sensors, {num_fog_nodes} fog nodes, {algorithm}")
+        print(f"[INFO] Starting simulation: {num_sensors} sensors, {num_edge_nodes} edge nodes, {algorithm}")
         
         environment = DigitalTwinEnvironment(3000, 2000)
         environment.initialize_sensors(num_sensors, seed=42)
-        environment.initialize_fog_nodes(num_fog_nodes, seed=42)
+        environment.initialize_edge_nodes(num_edge_nodes, seed=42)
         environment.initialize_cloud()
         
-        print(f"[INFO] Environment initialized with {len(environment.sensors)} sensors and {len(environment.fog_nodes)} fog nodes")
+        print(f"[INFO] Environment initialized with {len(environment.sensors)} sensors and {len(environment.edge_nodes)} edge nodes")
         
         app_obj = create_smart_healthcare_application(environment)
         topology = create_yafs_topology(environment)
@@ -122,12 +122,12 @@ def simulate():
             placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
         elif algorithm == 'olb':
             placement = OLBPlacement("OLB", placement_json, environment)
-        elif algorithm == 'random':
-            placement = LBS("Random", placement_json, environment)
-        elif algorithm == 'distance':
-            placement = LAB("Distance", placement_json, environment)
-        elif algorithm == 'loadbalanced':
-            placement = MEC("LoadBalanced", placement_json, environment)
+        elif algorithm == 'lbs':
+            placement = LBS("LBS", placement_json, environment)
+        elif algorithm == 'lab':
+            placement = LAB("LAB", placement_json, environment)
+        elif algorithm == 'mec':
+            placement = MEC("MEC", placement_json, environment)
         elif algorithm == 'fnpa':
             placement = FNPA("FNPA", placement_json, environment)
         else:
@@ -163,30 +163,30 @@ def simulate():
             for sensor in environment.sensors
         ]
         
-        fog_nodes_data = [
+        edge_nodes_data = [
             {
-                'id': fog.node_id,
-                'x': fog.coordinates[0],
-                'y': fog.coordinates[1],
-                'capacity': fog.processingPower
+                'id': edge.node_id,
+                'x': edge.coordinates[0],
+                'y': edge.coordinates[1],
+                'capacity': edge.processingPower
             }
-            for fog in environment.fog_nodes
+            for edge in environment.edge_nodes
         ]
         
         assignments = []
-        for fog_id, sensors in placement.module_assignments.items():
+        for edge_id, sensors in placement.module_assignments.items():
             for sensor in sensors:
                 assignments.append({
                     'sensorId': sensor.device_id,
-                    'fogId': fog_id
+                    'edgeId': edge_id
                 })
         
-        print(f"[INFO] Returning {len(sensors_data)} sensors, {len(fog_nodes_data)} fog nodes, {len(assignments)} assignments")
+        print(f"[INFO] Returning {len(sensors_data)} sensors, {len(edge_nodes_data)} edge nodes, {len(assignments)} assignments")
         
         simulation_cache[algorithm] = {
             'metrics': result,
             'sensors': sensors_data,
-            'fogNodes': fog_nodes_data,
+            'edgeNodes': edge_nodes_data,
             'assignments': assignments
         }
         
@@ -194,7 +194,7 @@ def simulate():
             'success': True,
             'metrics': result,
             'sensors': sensors_data,
-            'fogNodes': fog_nodes_data,
+            'edgeNodes': edge_nodes_data,
             'assignments': assignments
         })
         
@@ -214,7 +214,7 @@ def compare_algorithms():
     try:
         data = request.json
         num_sensors = data.get('numSensors', 10)
-        num_fog_nodes = data.get('numFogNodes', 4)
+        num_edge_nodes = data.get('numedgeNodes', 4)
         algorithms_to_compare = data.get('algorithms', ['olb', 'predictive', 'random', 'distance'])
         
         # Input validation
@@ -224,10 +224,10 @@ def compare_algorithms():
                 'error': 'Number of sensors must be between 1 and 100'
             }), 400
         
-        if not isinstance(num_fog_nodes, int) or num_fog_nodes < 1 or num_fog_nodes > 20:
+        if not isinstance(num_edge_nodes, int) or num_edge_nodes < 1 or num_edge_nodes > 20:
             return jsonify({
                 'success': False,
-                'error': 'Number of fog nodes must be between 1 and 20'
+                'error': 'Number of edge nodes must be between 1 and 20'
             }), 400
         
         if not isinstance(algorithms_to_compare, list) or len(algorithms_to_compare) < 1:
@@ -236,7 +236,7 @@ def compare_algorithms():
                 'error': 'Must specify at least one algorithm to compare'
             }), 400
         
-        valid_algorithms = ['olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+        valid_algorithms = ['olb', 'lbs', 'lab', 'mec', 'fnpa']
         if PREDICTIVE_AVAILABLE:
             valid_algorithms.append('predictive')
         
@@ -254,7 +254,7 @@ def compare_algorithms():
                 'error': 'Predictive algorithm is not available. Please install required dependencies.'
             }), 400
         
-        print(f"[INFO] Starting comparison with {num_sensors} sensors and {num_fog_nodes} fog nodes")
+        print(f"[INFO] Starting comparison with {num_sensors} sensors and {num_edge_nodes} edge nodes")
         print(f"[INFO] Comparing algorithms: {algorithms_to_compare}")
         
         results = {}
@@ -262,7 +262,7 @@ def compare_algorithms():
         # Create ONE environment that all algorithms will use (same seed for fair comparison)
         base_environment = DigitalTwinEnvironment(3000, 2000)
         base_environment.initialize_sensors(num_sensors, seed=42)
-        base_environment.initialize_fog_nodes(num_fog_nodes, seed=42)
+        base_environment.initialize_edge_nodes(num_edge_nodes, seed=42)
         base_environment.initialize_cloud()
         
         for algorithm in algorithms_to_compare:
@@ -271,7 +271,7 @@ def compare_algorithms():
             # Create a fresh environment with same configuration
             environment = DigitalTwinEnvironment(3000, 2000)
             environment.initialize_sensors(num_sensors, seed=42)
-            environment.initialize_fog_nodes(num_fog_nodes, seed=42)
+            environment.initialize_edge_nodes(num_edge_nodes, seed=42)
             environment.initialize_cloud()
             
             app_obj = create_smart_healthcare_application(environment)
@@ -293,12 +293,12 @@ def compare_algorithms():
                 placement = PredictiveLatencyPlacement("Predictive", placement_json, environment, prediction_horizon=10)
             elif algorithm == 'olb':
                 placement = OLBPlacement("OLB", placement_json, environment)
-            elif algorithm == 'random':
-                placement = LBS("Random", placement_json, environment)
-            elif algorithm == 'distance':
-                placement = LAB("Distance", placement_json, environment)
-            elif algorithm == 'loadbalanced':
-                placement = MEC("LoadBalanced", placement_json, environment)
+            elif algorithm == 'lbs':
+                placement = LBS("LBS", placement_json, environment)
+            elif algorithm == 'lab':
+                placement = LAB("LAB", placement_json, environment)
+            elif algorithm == 'mec':
+                placement = MEC("MEC", placement_json, environment)
             elif algorithm == 'fnpa':
                 placement = FNPA("FNPA", placement_json, environment)
             else:
@@ -322,12 +322,12 @@ def compare_algorithms():
             s.run(until=200)
             
             print(f"[DEBUG] Collecting metrics for {algorithm}...")
-            print(f"[DEBUG] Placement has {len(placement.module_assignments)} fog nodes with assignments")
+            print(f"[DEBUG] Placement has {len(placement.module_assignments)} edge nodes with assignments")
             
             # Verify assignments are different
             assignment_summary = {}
-            for fog_id, sensors in placement.module_assignments.items():
-                assignment_summary[fog_id] = len(sensors)
+            for edge_id, sensors in placement.module_assignments.items():
+                assignment_summary[edge_id] = len(sensors)
             print(f"[DEBUG] {algorithm} assignment distribution: {assignment_summary}")
             
             metrics = PerformanceMetrics()
@@ -349,27 +349,27 @@ def compare_algorithms():
                 for sensor in environment.sensors
             ]
             
-            fog_nodes_data = [
+            edge_nodes_data = [
                 {
-                    'id': fog.node_id,
-                    'x': fog.coordinates[0],
-                    'y': fog.coordinates[1],
-                    'capacity': fog.processingPower
+                    'id': edge.node_id,
+                    'x': edge.coordinates[0],
+                    'y': edge.coordinates[1],
+                    'capacity': edge.processingPower
                 }
-                for fog in environment.fog_nodes
+                for edge in environment.edge_nodes
             ]
             
             # Get assignments - check both module_assignments and direct sensor assignments
             assignments = []
             print(f"[DEBUG] Module assignments for {algorithm}: {placement.module_assignments}")
             
-            # Try to get sensor-to-fog assignments
+            # Try to get sensor-to-edge assignments
             if hasattr(placement, 'module_assignments') and placement.module_assignments:
-                for fog_id, sensors in placement.module_assignments.items():
+                for edge_id, sensors in placement.module_assignments.items():
                     for sensor in sensors:
                         assignments.append({
                             'sensorId': sensor.device_id,
-                            'fogId': fog_id
+                            'edgeId': edge_id
                         })
             
             # If no assignments found, return error instead of creating fake data
@@ -385,7 +385,7 @@ def compare_algorithms():
             results[algorithm] = {
                 'metrics': result,
                 'sensors': sensors_data,
-                'fogNodes': fog_nodes_data,
+                'edgeNodes': edge_nodes_data,
                 'assignments': assignments
             }
             
@@ -439,9 +439,9 @@ def generate_chart():
         algorithm_display_names = {
             'olb': 'OLB',
             'predictive': 'Predictive',
-            'random': 'Random',
-            'distance': 'Distance',
-            'loadbalanced': 'LoadBalanced',
+            'lbs': 'Location-Based',
+            'lab': 'Load-Aware',
+            'mec': 'Multi-Edge',
             'fnpa': 'FNPA'
         }
         
@@ -557,15 +557,15 @@ def generate_chart():
 
 @app.route('/api/environment-info')
 def environment_info():
-    algorithms = ['olb', 'random', 'distance', 'loadbalanced', 'fnpa']
+    algorithms = ['olb', 'lbs', 'lab', 'mec', 'fnpa']
     if PREDICTIVE_AVAILABLE:
         algorithms.insert(1, 'predictive')  # Insert after 'olb'
     
     return jsonify({
         'defaultSensors': 10,
-        'defaultFogNodes': 4,
+        'defaultedgeNodes': 4,
         'maxSensors': 30,
-        'maxFogNodes': 10,
+        'maxedgeNodes': 10,
         'algorithms': algorithms,
         'predictiveAvailable': PREDICTIVE_AVAILABLE
     })
@@ -579,7 +579,7 @@ def test_algorithms():
         # Create a simple test environment
         env = DigitalTwinEnvironment(3000, 2000)
         env.initialize_sensors(5, seed=42)
-        env.initialize_fog_nodes(2, seed=42)
+        env.initialize_edge_nodes(2, seed=42)
         env.initialize_cloud()
         
         app_obj = create_smart_healthcare_application(env)
@@ -595,12 +595,12 @@ def test_algorithms():
         for alg_name, alg_class in [
             ('olb', OLBPlacement),
             ('predictive', lambda n, j, e: PredictiveLatencyPlacement(n, j, e, prediction_horizon=10)),
-            ('random', LBS)
+            ('lbs', LBS)
         ]:
             # Create fresh environment
             test_env = DigitalTwinEnvironment(3000, 2000)
             test_env.initialize_sensors(5, seed=42)
-            test_env.initialize_fog_nodes(2, seed=42)
+            test_env.initialize_edge_nodes(2, seed=42)
             test_env.initialize_cloud()
             
             test_app = create_smart_healthcare_application(test_env)
@@ -624,8 +624,8 @@ def test_algorithms():
             
             # Get assignment distribution
             distribution = {}
-            for fog_id, sensors in placement.module_assignments.items():
-                distribution[f"fog_{fog_id}"] = len(sensors)
+            for edge_id, sensors in placement.module_assignments.items():
+                distribution[f"edge_{edge_id}"] = len(sensors)
             
             test_results[alg_name] = {
                 'distribution': distribution,

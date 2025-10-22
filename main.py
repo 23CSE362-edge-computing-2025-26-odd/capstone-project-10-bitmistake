@@ -52,9 +52,8 @@ def get_or_create_workload_predictor(model_dir: str = "CI_Models/Workload/models
     _cached_workload_predictor = WorkloadPredictor(model_dir=model_dir)
     return _cached_workload_predictor
 
-
 def clear_workload_predictor_cache():
-    """Clear the cached workload predictor to free memory."""
+    """Clear the workload predictor cache to prevent memory leaks."""
     global _cached_workload_predictor
     _cached_workload_predictor = None
     print("[INFO] Workload predictor cache cleared")
@@ -83,8 +82,8 @@ def run_olb_simulation():
     environment.initialize_sensors(
         num_sensors=config.num_sensors, seed=config.random_seed
     )
-    environment.initialize_fog_nodes(
-        num_fog_nodes=config.num_fog_nodes, seed=config.random_seed
+    environment.initialize_edge_nodes(
+        num_edge_nodes=config.num_edge_nodes, seed=config.random_seed
     )
 
     # --- OPTIONAL: RUN CI MODEL (LSTM WORKLOAD PREDICTOR) ---
@@ -108,14 +107,14 @@ def run_olb_simulation():
                 except Exception as e:
                     return node_name, None
 
-            with ThreadPoolExecutor(max_workers=min(6, len(environment.fog_nodes))) as executor:
-                futures = [executor.submit(predict_single_node, i) for i in range(len(environment.fog_nodes))]
+            with ThreadPoolExecutor(max_workers=min(6, len(environment.edge_nodes))) as executor:
+                futures = [executor.submit(predict_single_node, i) for i in range(len(environment.edge_nodes))]
                 for future in as_completed(futures):
                     node_name, stats = future.result()
                     if stats:
                         workload_predictions[node_name] = stats
             
-            print(f"✓ LSTM predictions completed for {len(workload_predictions)} nodes")
+            print(f"LSTM predictions completed for {len(workload_predictions)} nodes")
             
         except Exception as e:
             print(f"Warning: LSTM model initialization failed: {e}")
@@ -126,9 +125,9 @@ def run_olb_simulation():
         print("SKIPPING CI Model - WorkloadPredictor not available")
         print("=" * 70)
 
-    # --- ADJUST FOG NODE CAPACITIES BASED ON PREDICTED WORKLOAD ---
+    # --- ADJUST edge NODE CAPACITIES BASED ON PREDICTED WORKLOAD ---
     if workload_predictions:
-        print("Adjusting fog node capacities based on predicted workloads...")
+        print("Adjusting edge node capacities based on predicted workloads...")
         
         # Constants for capacity adjustment
         CAPACITY_INCREASE_FACTOR = 0.3  # 30% increase for high-load nodes
@@ -140,7 +139,7 @@ def run_olb_simulation():
         total_predicted_load = 0
         node_predictions = {}
         
-        for i, fog_node in enumerate(environment.fog_nodes):
+        for i, edge_node in enumerate(environment.edge_nodes):
             node_name = f"system-{i+1}"
             if node_name in workload_predictions:
                 predicted_load = workload_predictions[node_name]["predicted_avg"]
@@ -149,7 +148,7 @@ def run_olb_simulation():
         
         avg_predicted_load = total_predicted_load / len(node_predictions) if node_predictions else DEFAULT_AVG_LOAD
         
-        for i, fog_node in enumerate(environment.fog_nodes):
+        for i, edge_node in enumerate(environment.edge_nodes):
             if i in node_predictions:
                 predicted_load = node_predictions[i]
                 
@@ -162,9 +161,9 @@ def run_olb_simulation():
                 
                 # Clamp adjustment factor to safe bounds
                 adjustment_factor = max(MIN_ADJUSTMENT_FACTOR, min(MAX_ADJUSTMENT_FACTOR, adjustment_factor))
-                fog_node.processingPower *= adjustment_factor
+                edge_node.processingPower *= adjustment_factor
         
-        print("✓ Fog node capacity adjustments completed")
+        print("edge node capacity adjustments completed")
 
     # --- SETUP YAFS APPLICATION AND TOPOLOGY ---
     print("Setting up YAFS application and topology...")
@@ -196,9 +195,9 @@ def run_olb_simulation():
             "ci_predictions": workload_predictions,
             "environment_info": {
                 "num_sensors": len(environment.sensors),
-                "num_fog_nodes": len(environment.fog_nodes),
+                "num_edge_nodes": len(environment.edge_nodes),
                 "sensor_coordinates": [s.coordinates for s in environment.sensors],
-                "fog_node_coordinates": [f.coordinates for f in environment.fog_nodes],
+                "edge_node_coordinates": [f.coordinates for f in environment.edge_nodes],
             },
             "performance_metrics": metrics.get_summary_dict(),
             "simulation_metadata": {
@@ -215,8 +214,8 @@ def run_olb_simulation():
         save_results(metrics, olb_placement, "reports/olb_simulation_report.txt")
 
         print("\n" + "=" * 80)
-        print("✓ OLB SIMULATION COMPLETED SUCCESSFULLY!")
-        print(f"✓ Results saved to: {results_filename}")
+        print("OLB SIMULATION COMPLETED SUCCESSFULLY!")
+        print(f"Results saved to: {results_filename}")
         print("=" * 80)
         
         # Clear cache to free memory
@@ -262,8 +261,8 @@ def run_algorithm_comparison():
         environment.initialize_sensors(
             num_sensors=config.num_sensors, seed=config.random_seed
         )
-        environment.initialize_fog_nodes(
-            num_fog_nodes=config.num_fog_nodes, seed=config.random_seed
+        environment.initialize_edge_nodes(
+            num_edge_nodes=config.num_edge_nodes, seed=config.random_seed
         )
 
         app = create_smart_healthcare_application(environment)
@@ -278,6 +277,10 @@ def run_algorithm_comparison():
 
             placement = AlgoClass(algo_name, placement_json, environment)
             sim.deploy_app(app, placement, population)
+            
+            # Connect MQTT to YAFS simulation for real-time event publishing
+            mqtt_env.connect_to_yafs_simulation(sim)
+            
             sim.run(until=config.simulation_time)
 
             metrics = PerformanceMetrics()
@@ -299,15 +302,20 @@ def run_algorithm_comparison():
 
             save_results(metrics, placement, f"reports/{algo_name.lower()}_report.txt")
 
-            print(f"✓ {algo_name} completed, results saved to {results_filename}")
+            print(f"{algo_name} completed, results saved to {results_filename}")
 
         except Exception as e:
             print(f"ERROR running {algo_name}: {e}")
             continue
 
     print("\n" + "=" * 80)
-    print("✓ ALGORITHM COMPARISON COMPLETED")
+    print("ALGORITHM COMPARISON COMPLETED")
     print("=" * 80)
+    
+    # Clear cache to free memory
+    if WORKLOAD_PREDICTOR_AVAILABLE:
+        clear_workload_predictor_cache()
+    
     return 0
 
 
@@ -330,7 +338,7 @@ def run_hospital_comparison():
         
         mqtt_env = MQTTSimulationEnvironment()
         mqtt_env.simulation_time = 0
-        print("✓ MQTT environment ready")
+        print("MQTT environment ready")
         
         # Phase 3: Load Scenarios
         print("\n[PHASE 3] Loading Hospital Scenarios")
@@ -338,7 +346,7 @@ def run_hospital_comparison():
         
         manager = ScenarioManager()
         scenarios = manager.get_all_scenarios()
-        print(f"✓ Loaded {len(scenarios)} scenarios")
+        print(f"Loaded {len(scenarios)} scenarios")
         manager.print_summary()
         
         # Phase 4: Run Comparison
@@ -366,8 +374,8 @@ def run_hospital_comparison():
                 })
         
         mqtt_stats = mqtt_env.get_statistics()
-        print(f"✓ MQTT published {mqtt_stats['messages_sent']} messages")
-        print(f"✓ Comparison completed ({phase4_duration:.2f}s)")
+        print(f"MQTT published {mqtt_stats['messages_sent']} messages")
+        print(f"Comparison completed ({phase4_duration:.2f}s)")
         
         # Phase 5: Export Results
         print("\n[PHASE 5] Exporting Results")
@@ -378,7 +386,7 @@ def run_hospital_comparison():
         
         runner.export_json(results, json_file)
         runner.export_html(results, html_file)
-        print("✓ Results exported")
+        print("Results exported")
         
         # Phase 6: Generate Visualizations
         print("\n[PHASE 6] Generating Visualizations")
@@ -398,12 +406,16 @@ def run_hospital_comparison():
         total_duration = time.time() - workflow_start
         
         print("\n" + "=" * 80)
-        print("✓ HOSPITAL WORKFLOW COMPLETED SUCCESSFULLY!")
-        print(f"✓ Total execution time: {total_duration:.2f}s ({total_duration/60:.2f}min)")
-        print(f"✓ JSON results: {json_file}")
-        print(f"✓ HTML report: {html_file}")
-        print(f"✓ Plots: plots/ directory")
+        print("HOSPITAL WORKFLOW COMPLETED SUCCESSFULLY!")
+        print(f"Total execution time: {total_duration:.2f}s ({total_duration/60:.2f}min)")
+        print(f"JSON results: {json_file}")
+        print(f"HTML report: {html_file}")
+        print(f"Plots: plots/ directory")
         print("=" * 80)
+        
+        # Clear cache to free memory
+        if WORKLOAD_PREDICTOR_AVAILABLE:
+            clear_workload_predictor_cache()
         
         return 0
         
@@ -417,7 +429,7 @@ def run_hospital_comparison():
 def main():
     """Main entry point with argument parsing"""
     parser = argparse.ArgumentParser(
-        description="OLB Fog Computing Simulation System",
+        description="OLB edge Computing Simulation System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

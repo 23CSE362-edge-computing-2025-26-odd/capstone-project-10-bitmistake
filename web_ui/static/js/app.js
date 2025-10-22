@@ -91,16 +91,16 @@ document.getElementById('singleSensors').addEventListener('input', (e) => {
     document.getElementById('singleSensorsValue').textContent = e.target.value;
 });
 
-document.getElementById('singleFogNodes').addEventListener('input', (e) => {
-    document.getElementById('singleFogValue').textContent = e.target.value;
+document.getElementById('singleedgeNodes').addEventListener('input', (e) => {
+    document.getElementById('singleedgeValue').textContent = e.target.value;
 });
 
 document.getElementById('compareSensors').addEventListener('input', (e) => {
     document.getElementById('compareSensorsValue').textContent = e.target.value;
 });
 
-document.getElementById('compareFogNodes').addEventListener('input', (e) => {
-    document.getElementById('compareFogValue').textContent = e.target.value;
+document.getElementById('compareedgeNodes').addEventListener('input', (e) => {
+    document.getElementById('compareedgeValue').textContent = e.target.value;
 });
 
 // Single Run
@@ -118,16 +118,16 @@ async function runSingle() {
     btnLoader.style.display = 'inline';
     
     const numSensors = parseInt(document.getElementById('singleSensors').value);
-    const numFogNodes = parseInt(document.getElementById('singleFogNodes').value);
+    const numedgeNodes = parseInt(document.getElementById('singleedgeNodes').value);
     const algorithm = document.getElementById('singleAlgorithm').value;
     
-    console.log(`Running: ${algorithm}, ${numSensors} sensors, ${numFogNodes} fog nodes`);
+    console.log(`Running: ${algorithm}, ${numSensors} sensors, ${numedgeNodes} edge nodes`);
     
     try {
         const response = await fetch('/api/simulate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ numSensors, numFogNodes, algorithm })
+            body: JSON.stringify({ numSensors, numedgeNodes, algorithm })
         });
         
         const data = await response.json();
@@ -170,7 +170,7 @@ function displaySingleResults(data) {
     animateValue('singleNetwork', data.metrics.network_usage);
     
     document.getElementById('singleSensorCount').textContent = data.sensors.length;
-    document.getElementById('singleFogCount').textContent = data.fogNodes.length;
+    document.getElementById('singleedgeCount').textContent = data.edgeNodes.length;
     document.getElementById('singleLinkCount').textContent = data.assignments.length;
 }
 
@@ -254,19 +254,19 @@ function drawCanvas(canvasId, data) {
     ctx.lineCap = 'round';
     data.assignments.forEach(a => {
         const sensor = data.sensors.find(s => s.id  a.sensorId);
-        const fog = data.fogNodes.find(f => f.id  a.fogId);
-        if (sensor && fog) {
+        const edge = data.edgeNodes.find(f => f.id  a.edgeId);
+        if (sensor && edge) {
             ctx.beginPath();
             ctx.moveTo(sensor.x * scaleX, sensor.y * scaleY);
-            ctx.lineTo(fog.x * scaleX, fog.y * scaleY);
+            ctx.lineTo(edge.x * scaleX, edge.y * scaleY);
             ctx.stroke();
         }
     });
     
-    // Draw fog nodes with better visual quality
-    data.fogNodes.forEach(fog => {
-        const x = fog.x * scaleX;
-        const y = fog.y * scaleY;
+    // Draw edge nodes with better visual quality
+    data.edgeNodes.forEach(edge => {
+        const x = edge.x * scaleX;
+        const y = edge.y * scaleY;
         const size = Math.max(16, Math.min(24, canvas.width / 30));
         
         // Shadow effect
@@ -275,7 +275,7 @@ function drawCanvas(canvasId, data) {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         
-        // Main fog node
+        // Main edge node
         ctx.fillStyle = '#d4a574';
         ctx.fillRect(x - size/2, y - size/2, size, size);
         
@@ -293,7 +293,7 @@ function drawCanvas(canvasId, data) {
         ctx.fillStyle = '#f0ce9e';
         ctx.font = `${Math.max(10, canvas.width / 40)}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(`F${fog.id}`, x, y + size/2 + 16);
+        ctx.fillText(`F${edge.id}`, x, y + size/2 + 16);
     });
     
     // Draw sensors with better visual quality
@@ -331,7 +331,7 @@ function drawCanvas(canvasId, data) {
         ctx.fillText(`S${sensor.id}`, x, y + radius + 14);
     });
     
-    console.log(`Drew ${data.sensors.length} sensors, ${data.fogNodes.length} fog nodes on canvas ${canvasId}`);
+    console.log(`Drew ${data.sensors.length} sensors, ${data.edgeNodes.length} edge nodes on canvas ${canvasId}`);
 }
 
 // Compare
@@ -360,7 +360,7 @@ async function runCompare() {
     btnLoader.style.display = 'inline';
     
     const numSensors = parseInt(document.getElementById('compareSensors').value);
-    const numFogNodes = parseInt(document.getElementById('compareFogNodes').value);
+    const numedgeNodes = parseInt(document.getElementById('compareedgeNodes').value);
     
     console.log(`Comparing: ${algorithms.join(', ')}`);
     
@@ -368,7 +368,7 @@ async function runCompare() {
         const response = await fetch('/api/compare', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ numSensors, numFogNodes, algorithms })
+            body: JSON.stringify({ numSensors, numedgeNodes, algorithms })
         });
         
         const data = await response.json();

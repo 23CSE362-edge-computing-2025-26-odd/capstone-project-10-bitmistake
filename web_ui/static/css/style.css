@@ -431,7 +431,7 @@ canvas {
     background: var(--primary);
 }
 
-.legend-dot.fog {
+.legend-dot.edge {
     background: var(--primary-dark);
     border-radius: 4px;
 }

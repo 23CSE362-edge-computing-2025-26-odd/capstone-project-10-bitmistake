@@ -14,7 +14,7 @@ class DigitalTwinEnvironment:
         self.width = width
         self.height = height
         self.sensors = []
-        self.fog_nodes = []
+        self.edge_nodes = []
         self.cloud_node = None
         self.proxy_node = None
 
@@ -30,16 +30,16 @@ class DigitalTwinEnvironment:
                 f"Sensor coordinates {sensor.coordinates} outside environment bounds"
             )
 
-    def add_fog_node(self, fog_node):
-        """Add fog node to the environment"""
+    def add_edge_node(self, edge_node):
+        """Add edge node to the environment"""
         if (
-            0 <= fog_node.coordinates[0] <= self.width
-            and 0 <= fog_node.coordinates[1] <= self.height
+            0 <= edge_node.coordinates[0] <= self.width
+            and 0 <= edge_node.coordinates[1] <= self.height
         ):
-            self.fog_nodes.append(fog_node)
+            self.edge_nodes.append(edge_node)
         else:
             raise ValueError(
-                f"Fog node coordinates {fog_node.coordinates} outside environment bounds"
+                f"edge node coordinates {edge_node.coordinates} outside environment bounds"
             )
 
     def initialize_sensors(self, num_sensors=10, seed=None):
@@ -75,11 +75,11 @@ class DigitalTwinEnvironment:
 
             print(f"[INFO] Sensor {i} added at {coordinates}")
 
-    def initialize_fog_nodes(self, num_fog_nodes=6, seed=None):
+    def initialize_edge_nodes(self, num_edge_nodes=6, seed=None):
         # Use a separate Random instance to avoid affecting global random state
         rng = random.Random(seed + 100) if seed is not None else random.Random()
-        print(f"[DEBUG] Initializing {num_fog_nodes} fog nodes")
-        for i in range(num_fog_nodes):
+        print(f"[DEBUG] Initializing {num_edge_nodes} edge nodes")
+        for i in range(num_edge_nodes):
             max_x = min(2500, self.width - 100)
             max_y = min(1500, self.height - 100)
             coordinates = (rng.uniform(100, max_x), rng.uniform(100, max_y))
@@ -88,7 +88,7 @@ class DigitalTwinEnvironment:
             carrier_frequency = rng.uniform(2.4, 5.0)
             noise_power = rng.uniform(1e-12, 1e-10)
 
-            fog_node = EdgeNodeDevice(
+            edge_node = EdgeNodeDevice(
                 node_id=i,
                 coordinates=coordinates,
                 processing_power=processing_power,
@@ -96,10 +96,10 @@ class DigitalTwinEnvironment:
                 carrier_frequency=carrier_frequency,
                 noise_power=noise_power,
             )
-            self.add_fog_node(fog_node)
+            self.add_edge_node(edge_node)
 
             print(
-                f"[INFO] FogNode {i} created at {coordinates} with {processing_power:.2f} MIPS"
+                f"[INFO] edgeNode {i} created at {coordinates} with {processing_power:.2f} MIPS"
             )
 
     def initialize_cloud(self):
@@ -116,15 +116,15 @@ class DigitalTwinEnvironment:
         """Get summary of the environment"""
         print(
             "[SUMMARY] Environment contains "
-            f"{len(self.sensors)} sensors, {len(self.fog_nodes)} fog nodes, "
+            f"{len(self.sensors)} sensors, {len(self.edge_nodes)} edge nodes, "
             f"Cloud exists: {self.cloud_node is not None}"
         )
         return {
             "environment_size": (self.width, self.height),
             "num_sensors": len(self.sensors),
-            "num_fog_nodes": len(self.fog_nodes),
+            "num_edge_nodes": len(self.edge_nodes),
             "sensor_positions": [s.coordinates for s in self.sensors],
-            "fog_node_positions": [f.coordinates for f in self.fog_nodes],
+            "edge_node_positions": [f.coordinates for f in self.edge_nodes],
             "cloud_node": {
                 "exists": self.cloud_node is not None,
                 "coordinates": getattr(self.cloud_node, "coordinates", None),
@@ -147,12 +147,12 @@ class DigitalTwinEnvironment:
             environment_height: Height of the simulation environment
             
         Returns:
-            Initialized DigitalTwinEnvironment with sensors and fog nodes
+            Initialized DigitalTwinEnvironment with sensors and edge nodes
         """
         from .hospital_scenarios_extended import SensorConfig, HospitalScenario
         
         print(f"Converting scenario '{scenario.name}' to environment")
-        print(f"  Scenario has {len(scenario.sensors)} sensors, {scenario.fog_nodes} fog nodes")
+        print(f"  Scenario has {len(scenario.sensors)} sensors, {scenario.edge_nodes} edge nodes")
         
         # Create environment
         environment = cls(width=environment_width, height=environment_height)
@@ -161,12 +161,12 @@ class DigitalTwinEnvironment:
         sensors = cls._convert_sensors_from_configs(scenario.sensors)
         environment.sensors = sensors
         
-        # Create fog nodes based on scenario requirements
-        cls._create_fog_nodes_for_scenario(environment, scenario)
+        # Create edge nodes based on scenario requirements
+        cls._create_edge_nodes_for_scenario(environment, scenario)
         
-        print(f"✓ Converted scenario to environment:")
+        print(f"Converted scenario to environment:")
         print(f"  - {len(environment.sensors)} sensors")
-        print(f"  - {len(environment.fog_nodes)} fog nodes")
+        print(f"  - {len(environment.edge_nodes)} edge nodes")
         
         return environment
     
@@ -281,36 +281,36 @@ class DigitalTwinEnvironment:
         return power_mappings.get(criticality.lower(), 0.5)
     
     @staticmethod
-    def _create_fog_nodes_for_scenario(environment, scenario):
+    def _create_edge_nodes_for_scenario(environment, scenario):
         """
-        Create fog nodes appropriate for the scenario.
+        Create edge nodes appropriate for the scenario.
         
-        Distributes fog nodes across the environment based on sensor locations.
+        Distributes edge nodes across the environment based on sensor locations.
         
         Args:
             environment: DigitalTwinEnvironment to populate
             scenario: HospitalScenario defining requirements
         """
-        num_fog_nodes = scenario.fog_nodes
+        num_edge_nodes = scenario.edge_nodes
         
-        # Get sensor locations to inform fog node placement
+        # Get sensor locations to inform edge node placement
         sensor_locations = [s.coordinates for s in environment.sensors]
         
-        # Calculate fog node positions to minimize average distance to sensors
-        fog_positions = DigitalTwinEnvironment._calculate_optimal_fog_positions(
+        # Calculate edge node positions to minimize average distance to sensors
+        edge_positions = DigitalTwinEnvironment._calculate_optimal_edge_positions(
             sensor_locations,
-            num_fog_nodes,
+            num_edge_nodes,
             environment.width,
             environment.height
         )
         
-        # Create fog nodes with appropriate capacities
-        fog_nodes = []
-        for i, position in enumerate(fog_positions):
+        # Create edge nodes with appropriate capacities
+        edge_nodes = []
+        for i, position in enumerate(edge_positions):
             # Adjust capacity based on scenario requirements
-            base_capacity = DigitalTwinEnvironment._estimate_required_capacity(scenario, num_fog_nodes)
+            base_capacity = DigitalTwinEnvironment._estimate_required_capacity(scenario, num_edge_nodes)
             
-            fog_node = EdgeNodeDevice(
+            edge_node = EdgeNodeDevice(
                 node_id=i,
                 coordinates=position,
                 processing_power=base_capacity,
@@ -318,64 +318,64 @@ class DigitalTwinEnvironment:
                 carrier_frequency=2.4,  # GHz
                 noise_power=1e-10  # Watts
             )
-            fog_nodes.append(fog_node)
+            edge_nodes.append(edge_node)
         
-        environment.fog_nodes = fog_nodes
+        environment.edge_nodes = edge_nodes
         
-        print(f"Created {len(fog_nodes)} fog nodes for scenario")
+        print(f"Created {len(edge_nodes)} edge nodes for scenario")
     
     @staticmethod
-    def _calculate_optimal_fog_positions(
+    def _calculate_optimal_edge_positions(
         sensor_locations: List[Tuple[float, float]],
-        num_fog_nodes: int,
+        num_edge_nodes: int,
         width: int,
         height: int
     ) -> List[Tuple[float, float]]:
         """
-        Calculate optimal fog node positions using k-means-like clustering.
+        Calculate optimal edge node positions using k-means-like clustering.
         
         Args:
             sensor_locations: List of (x, y) sensor coordinates
-            num_fog_nodes: Number of fog nodes to place
+            num_edge_nodes: Number of edge nodes to place
             width: Environment width
             height: Environment height
             
         Returns:
-            List of (x, y) positions for fog nodes
+            List of (x, y) positions for edge nodes
         """
         import math
         
         if not sensor_locations:
             # Fallback: distribute evenly if no sensors
             positions = []
-            for i in range(num_fog_nodes):
-                x = (i + 1) * width / (num_fog_nodes + 1)
+            for i in range(num_edge_nodes):
+                x = (i + 1) * width / (num_edge_nodes + 1)
                 y = height / 2
                 positions.append((x, y))
             return positions
         
-        # Simple clustering: divide sensors into groups and place fog node at centroid
+        # Simple clustering: divide sensors into groups and place edge node at centroid
         random.seed(42)  # Reproducible placement
         
-        # Initialize fog positions randomly
+        # Initialize edge positions randomly
         positions = [
             (random.uniform(width * 0.2, width * 0.8), 
              random.uniform(height * 0.2, height * 0.8))
-            for _ in range(num_fog_nodes)
+            for _ in range(num_edge_nodes)
         ]
         
         # Run simple k-means for a few iterations
         for iteration in range(10):
-            # Assign sensors to nearest fog node
-            clusters = [[] for _ in range(num_fog_nodes)]
+            # Assign sensors to nearest edge node
+            clusters = [[] for _ in range(num_edge_nodes)]
             for sensor_loc in sensor_locations:
-                nearest_fog = min(
-                    range(num_fog_nodes),
+                nearest_edge = min(
+                    range(num_edge_nodes),
                     key=lambda i: DigitalTwinEnvironment._distance(sensor_loc, positions[i])
                 )
-                clusters[nearest_fog].append(sensor_loc)
+                clusters[nearest_edge].append(sensor_loc)
             
-            # Update fog positions to cluster centroids
+            # Update edge positions to cluster centroids
             new_positions = []
             for i, cluster in enumerate(clusters):
                 if cluster:
@@ -398,16 +398,16 @@ class DigitalTwinEnvironment:
         return math.sqrt(dx**2 + dy**2)
     
     @staticmethod
-    def _estimate_required_capacity(scenario, num_fog_nodes: int) -> float:
+    def _estimate_required_capacity(scenario, num_edge_nodes: int) -> float:
         """
-        Estimate required fog node processing capacity for scenario.
+        Estimate required edge node processing capacity for scenario.
         
         Args:
             scenario: HospitalScenario
-            num_fog_nodes: Number of fog nodes to distribute load across
+            num_edge_nodes: Number of edge nodes to distribute load across
             
         Returns:
-            Processing power in MIPS per fog node
+            Processing power in MIPS per edge node
         """
         # Calculate total workload from sensors
         total_workload = 0.0
@@ -420,8 +420,8 @@ class DigitalTwinEnvironment:
             else:
                 total_workload += sensor_config.frequency_hz * 100
         
-        # Distribute across fog nodes with safety margin
-        capacity_per_node = (total_workload / num_fog_nodes) * 1.5  # 50% safety margin
+        # Distribute across edge nodes with safety margin
+        capacity_per_node = (total_workload / num_edge_nodes) * 1.5  # 50% safety margin
         
         # Ensure minimum capacity
         return max(1000.0, capacity_per_node)

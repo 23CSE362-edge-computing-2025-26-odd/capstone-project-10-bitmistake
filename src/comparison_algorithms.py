@@ -1,8 +1,3 @@
-"""
-Real Implementation of Placement Algorithms for Fog Computing
-Includes LBS, LAB, MEC, and FNPA algorithms with proper algorithmic logic
-"""
-
 import math
 from typing import Dict, List, Optional, Tuple
 from yafs import Placement
@@ -15,7 +10,7 @@ class LBS(Placement):
     Location-Based Selection (LBS) Algorithm
     
     Strategy: Select placement nodes by minimizing average Euclidean distance 
-    between sensors and fog nodes. Prioritizes nearest nodes first.
+    between sensors and edge nodes. Prioritizes nearest nodes first.
     
     Key Features:
     - Pure distance-based optimization
@@ -47,11 +42,11 @@ class LBS(Placement):
             sensor = self.sensor_lookup.find_by_id(sensor_id)
             
             if sensor:
-                # Find nearest fog node
-                optimal_node_id, distance = self._find_nearest_fog_node(sensor)
+                # Find nearest edge node
+                optimal_node_id, distance = self._find_nearest_edge_node(sensor)
                 
                 if optimal_node_id is not None:
-                    node_name = f"fog_{optimal_node_id}"
+                    node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
                     
                     # Track assignment
@@ -62,7 +57,7 @@ class LBS(Placement):
                     placement_count += 1
                     total_distance += distance
                     
-                    print(f"  [LBS] Sensor {sensor_id} -> fog_{optimal_node_id} "
+                    print(f"  [LBS] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(distance: {distance:.2f}m)")
         
         avg_distance = total_distance / placement_count if placement_count > 0 else 0
@@ -70,13 +65,13 @@ class LBS(Placement):
         print(f"[LBS] Average Distance: {avg_distance:.2f}m")
         print(f"{'='*70}\n")
     
-    def _find_nearest_fog_node(self, sensor) -> Tuple[Optional[int], float]:
-        """Find the nearest fog node to the sensor"""
+    def _find_nearest_edge_node(self, sensor) -> Tuple[Optional[int], float]:
+        """Find the nearest edge node to the sensor"""
         min_distance = float("inf")
         nearest_node_id = None
         
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
-            distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
+            distance = calculate_euclidean_distance(sensor.coordinates, edge_node.coordinates)
             
             if distance < min_distance:
                 min_distance = distance
@@ -93,7 +88,7 @@ class LAB(Placement):
     Uses weighted scoring: score = α·(1/load) + β·(1/distance)
     
     Key Features:
-    - Balances load across fog nodes
+    - Balances load across edge nodes
     - Considers both distance and current utilization
     - Adaptive weighting based on system state
     """
@@ -112,11 +107,11 @@ class LAB(Placement):
         
         # Track node loads
         self.node_loads: Dict[int, float] = {
-            i: 0.0 for i in range(len(digital_twin.fog_nodes))
+            i: 0.0 for i in range(len(digital_twin.edge_nodes))
         }
         self.node_capacities: Dict[int, float] = {
-            i: fog_node.processingPower 
-            for i, fog_node in enumerate(digital_twin.fog_nodes)
+            i: edge_node.processingPower 
+            for i, edge_node in enumerate(digital_twin.edge_nodes)
         }
     
     def initial_allocation(self, sim, app_name: str):
@@ -140,7 +135,7 @@ class LAB(Placement):
                 optimal_node_id, score = self._find_optimal_node(sensor)
                 
                 if optimal_node_id is not None:
-                    node_name = f"fog_{optimal_node_id}"
+                    node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
                     
                     # Track assignment
@@ -156,7 +151,7 @@ class LAB(Placement):
                                  self.node_capacities[optimal_node_id] * 100)
                     
                     placement_count += 1
-                    print(f"  [LAB] Sensor {sensor_id} -> fog_{optimal_node_id} "
+                    print(f"  [LAB] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(score: {score:.4f}, util: {utilization:.1f}%)")
         
         print(f"\n[LAB] Placement Complete: {placement_count} modules placed")
@@ -171,9 +166,9 @@ class LAB(Placement):
         # Normalize factors for scoring
         max_distance = self._get_max_distance()
 
-                for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             # Calculate distance component
-            distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
+            distance = calculate_euclidean_distance(sensor.coordinates, edge_node.coordinates)
             normalized_distance = distance / max_distance if max_distance > 0 else 0
             
             # Calculate load component
@@ -205,10 +200,10 @@ class LAB(Placement):
     def _print_load_distribution(self):
         """Print load distribution across nodes"""
         print(f"\n[LAB] Load Distribution:")
-        for i in range(len(self.digital_twin.fog_nodes)):
+        for i in range(len(self.digital_twin.edge_nodes)):
             utilization = (self.node_loads[i] / self.node_capacities[i] * 100)
             assignments = len(self.module_assignments.get(i, []))
-            print(f"  fog_{i}: {assignments} sensors, {utilization:.1f}% utilized")
+            print(f"  edge_{i}: {assignments} sensors, {utilization:.1f}% utilized")
 
 
 class MEC(Placement):
@@ -238,10 +233,10 @@ class MEC(Placement):
         
         # Track node states
         self.node_loads: Dict[int, float] = {
-            i: 0.0 for i in range(len(digital_twin.fog_nodes))
+            i: 0.0 for i in range(len(digital_twin.edge_nodes))
         }
         self.node_energy_consumption: Dict[int, float] = {
-            i: 0.0 for i in range(len(digital_twin.fog_nodes))
+            i: 0.0 for i in range(len(digital_twin.edge_nodes))
         }
     
     def initial_allocation(self, sim, app_name: str):
@@ -266,7 +261,7 @@ class MEC(Placement):
                 optimal_node_id, latency_cost, energy_cost = self._find_optimal_edge(sensor)
 
                 if optimal_node_id is not None:
-                    node_name = f"fog_{optimal_node_id}"
+                    node_name = f"edge_{optimal_node_id}"
                 sim.deploy_module(app_name, module_name, [], [node_name])
 
                     # Track assignment
@@ -280,7 +275,7 @@ class MEC(Placement):
                     total_energy += energy_cost
                     
                     placement_count += 1
-                    print(f"  [MEC] Sensor {sensor_id} -> fog_{optimal_node_id} "
+                    print(f"  [MEC] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(latency: {latency_cost:.2f}ms, energy: {energy_cost:.2f}J)")
         
         avg_energy = total_energy / placement_count if placement_count > 0 else 0
@@ -297,12 +292,12 @@ class MEC(Placement):
         best_latency = 0.0
         best_energy = 0.0
         
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             # Calculate latency cost (communication + computation)
-            latency_cost = self._estimate_latency(sensor, fog_node, i)
+            latency_cost = self._estimate_latency(sensor, edge_node, i)
             
             # Calculate energy cost
-            energy_cost = self._estimate_energy(sensor, fog_node, i)
+            energy_cost = self._estimate_energy(sensor, edge_node, i)
             
             # Normalize costs (0-1 range)
             normalized_latency = latency_cost / 100.0  # Assume max latency ~100ms
@@ -320,28 +315,28 @@ class MEC(Placement):
         
         return best_node_id, best_latency, best_energy
     
-    def _estimate_latency(self, sensor, fog_node, node_id: int) -> float:
+    def _estimate_latency(self, sensor, edge_node, node_id: int) -> float:
         """Estimate latency for assignment"""
         # Distance-based communication latency
-        distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
+        distance = calculate_euclidean_distance(sensor.coordinates, edge_node.coordinates)
         comm_latency = distance / 1000.0  # Simple model: 1ms per km
         
         # Load-based computation latency
         current_load = self.node_loads[node_id]
-        capacity = fog_node.processingPower
+        capacity = edge_node.processingPower
         comp_latency = (current_load + 1) / capacity * 10.0  # Simple model
         
         return comm_latency + comp_latency
     
-    def _estimate_energy(self, sensor, fog_node, node_id: int) -> float:
+    def _estimate_energy(self, sensor, edge_node, node_id: int) -> float:
         """Estimate energy consumption for assignment"""
         # Distance-based transmission energy
-        distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
+        distance = calculate_euclidean_distance(sensor.coordinates, edge_node.coordinates)
         transmission_energy = sensor.transmissionPower * (distance / 1000.0) * 0.001
         
         # Computation energy (based on workload)
         workload = sensor.averageFlowSize * sensor.averageFlowRate
-        computation_energy = workload / fog_node.processingPower * 0.5
+        computation_energy = workload / edge_node.processingPower * 0.5
         
         # Load factor (higher load = higher energy per task)
         load_factor = 1.0 + (self.node_loads[node_id] / 10.0)
@@ -351,19 +346,19 @@ class MEC(Placement):
     def _print_edge_coordination_status(self):
         """Print coordination status across edges"""
         print(f"\n[MEC] Edge Coordination Status:")
-        for i in range(len(self.digital_twin.fog_nodes)):
+        for i in range(len(self.digital_twin.edge_nodes)):
             load = self.node_loads[i]
             energy = self.node_energy_consumption[i]
             assignments = len(self.module_assignments.get(i, []))
-            print(f"  fog_{i}: {assignments} sensors, load={load:.1f}, energy={energy:.2f}J")
+            print(f"  edge_{i}: {assignments} sensors, load={load:.1f}, energy={energy:.2f}J")
 
 
 class FNPA(Placement):
     """
-    Fog Node Proximity Algorithm (FNPA)
+    edge Node Proximity Algorithm (FNPA)
     
-    Strategy: Choose fog nodes nearest to sensors with resource awareness.
-    Falls back to cloud if all fog nodes are saturated.
+    Strategy: Choose edge nodes nearest to sensors with resource awareness.
+    Falls back to cloud if all edge nodes are saturated.
     Prioritizes minimal hop distance and bandwidth availability.
     
     Key Features:
@@ -387,19 +382,19 @@ class FNPA(Placement):
         
         # Track node states
         self.node_loads: Dict[int, float] = {
-            i: 0.0 for i in range(len(digital_twin.fog_nodes))
+            i: 0.0 for i in range(len(digital_twin.edge_nodes))
         }
         self.node_capacities: Dict[int, float] = {
-            i: fog_node.processingPower 
-            for i, fog_node in enumerate(digital_twin.fog_nodes)
+            i: edge_node.processingPower 
+            for i, edge_node in enumerate(digital_twin.edge_nodes)
         }
         self.node_bandwidth_usage: Dict[int, float] = {
-            i: 0.0 for i in range(len(digital_twin.fog_nodes))
+            i: 0.0 for i in range(len(digital_twin.edge_nodes))
         }
         self.cloud_assignments = 0
     
     def initial_allocation(self, sim, app_name: str):
-        """Deploy modules using fog node proximity algorithm"""
+        """Deploy modules using edge node proximity algorithm"""
         app = sim.apps[app_name]
         modules_to_place = [m for m in app.modules if "Processing_Module" in m]
         
@@ -410,7 +405,7 @@ class FNPA(Placement):
         print(f"{'='*70}")
         
         placement_count = 0
-        fog_count = 0
+        edge_count = 0
         cloud_count = 0
 
         for module_name in modules_to_place:
@@ -418,12 +413,12 @@ class FNPA(Placement):
             sensor = self.sensor_lookup.find_by_id(sensor_id)
 
             if sensor:
-                # Try to find suitable fog node
-                optimal_node_id = self._find_suitable_fog_node(sensor)
+                # Try to find suitable edge node
+                optimal_node_id = self._find_suitable_edge_node(sensor)
                 
                 if optimal_node_id is not None:
-                    # Assign to fog node
-                    node_name = f"fog_{optimal_node_id}"
+                    # Assign to edge node
+                    node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
                     
                     if optimal_node_id not in self.module_assignments:
@@ -435,14 +430,14 @@ class FNPA(Placement):
                     self.node_loads[optimal_node_id] += workload
                     
                     bandwidth_demand = sensor.flowTrafficSize * sensor.averageFlowRate
-                    fog_node = self.digital_twin.fog_nodes[optimal_node_id]
-                    self.node_bandwidth_usage[optimal_node_id] += bandwidth_demand / fog_node.bandwidth
+                    edge_node = self.digital_twin.edge_nodes[optimal_node_id]
+                    self.node_bandwidth_usage[optimal_node_id] += bandwidth_demand / edge_node.bandwidth
                     
-                    fog_count += 1
+                    edge_count += 1
                     utilization = (self.node_loads[optimal_node_id] / 
                                  self.node_capacities[optimal_node_id] * 100)
                     
-                    print(f"  [FNPA] Sensor {sensor_id} -> fog_{optimal_node_id} "
+                    print(f"  [FNPA] Sensor {sensor_id} -> edge_{optimal_node_id} "
                           f"(util: {utilization:.1f}%)")
             else:
                     # Fallback to cloud
@@ -451,21 +446,21 @@ class FNPA(Placement):
                     self.cloud_assignments += 1
                     cloud_count += 1
                     
-                    print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (fog nodes saturated)")
+                    print(f"  [FNPA] Sensor {sensor_id} -> CLOUD (edge nodes saturated)")
                 
                 placement_count += 1
         
         print(f"\n[FNPA] Placement Complete: {placement_count} modules placed")
-        print(f"[FNPA] Fog Placements: {fog_count}, Cloud Fallbacks: {cloud_count}")
+        print(f"[FNPA] edge Placements: {edge_count}, Cloud Fallbacks: {cloud_count}")
         self._print_resource_status()
         print(f"{'='*70}\n")
     
-    def _find_suitable_fog_node(self, sensor) -> Optional[int]:
-        """Find nearest fog node with available resources"""
+    def _find_suitable_edge_node(self, sensor) -> Optional[int]:
+        """Find nearest edge node with available resources"""
         # Create list of (distance, node_id) pairs
         candidates = []
 
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             # Check resource availability
             utilization = self.node_loads[i] / self.node_capacities[i]
             bandwidth_util = self.node_bandwidth_usage[i]
@@ -477,11 +472,11 @@ class FNPA(Placement):
                 continue
             
             # Calculate distance (hop distance approximated by Euclidean distance)
-            distance = calculate_euclidean_distance(sensor.coordinates, fog_node.coordinates)
+            distance = calculate_euclidean_distance(sensor.coordinates, edge_node.coordinates)
             
             candidates.append((distance, i))
         
-        # No suitable fog node found
+        # No suitable edge node found
         if not candidates:
             return None
         
@@ -492,12 +487,12 @@ class FNPA(Placement):
     def _print_resource_status(self):
         """Print resource utilization status"""
         print(f"\n[FNPA] Resource Utilization:")
-        for i in range(len(self.digital_twin.fog_nodes)):
+        for i in range(len(self.digital_twin.edge_nodes)):
             utilization = (self.node_loads[i] / self.node_capacities[i] * 100)
             bandwidth_util = self.node_bandwidth_usage[i] * 100
             assignments = len(self.module_assignments.get(i, []))
             status = "SATURATED" if utilization >= self.resource_threshold * 100 else "AVAILABLE"
-            print(f"  fog_{i}: {assignments} sensors, CPU={utilization:.1f}%, "
+            print(f"  edge_{i}: {assignments} sensors, CPU={utilization:.1f}%, "
                   f"BW={bandwidth_util:.1f}% [{status}]")
         if self.cloud_assignments > 0:
             print(f"  cloud: {self.cloud_assignments} sensors (fallback)")

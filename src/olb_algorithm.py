@@ -13,12 +13,12 @@ class OLBLatencyCalculator:
     def __init__(self):
         self.speed_of_light = 299792458  # m/s
 
-    def calculate_distance(self, sensor_coords, fog_coords):
+    def calculate_distance(self, sensor_coords, edge_coords):
         """
-        Calculate Euclidean distance between sensor and fog node.
+        Calculate Euclidean distance between sensor and edge node.
         Uses common_utils implementation to avoid duplication.
         """
-        return calculate_euclidean_distance(sensor_coords, fog_coords)
+        return calculate_euclidean_distance(sensor_coords, edge_coords)
 
     def calculate_channel_gain(self, distance, carrier_frequency):
         """Calculate Channel Gain (g(x))"""
@@ -56,16 +56,16 @@ class OLBLatencyCalculator:
             return 1.0
         return (flow_rate * flow_size) / processing_power
 
-    def calculate_communication_latency(self, sensor, fog_node, assigned_sensors):
+    def calculate_communication_latency(self, sensor, edge_node, assigned_sensors):
         """
         Task 3.1.1: Communication Latency Analysis (L_m(j))
         """
         try:
             # Calculate Distance (d)
-            distance = self.calculate_distance(sensor.coordinates, fog_node.coordinates)
+            distance = self.calculate_distance(sensor.coordinates, edge_node.coordinates)
 
             # Calculate wavelength λ
-            wavelength = self.speed_of_light / (fog_node.carrierFrequency * 1e9)
+            wavelength = self.speed_of_light / (edge_node.carrierFrequency * 1e9)
 
             # Calculate Channel Gain (g(x))
             channel_gain = 10 * math.log10(
@@ -74,10 +74,10 @@ class OLBLatencyCalculator:
 
             # Calculate Signal-to-Noise Ratio (SNR(x))
             linear_gain = 10 ** (channel_gain / 10)
-            snr = (sensor.transmissionPower * linear_gain) / fog_node.noisePower
+            snr = (sensor.transmissionPower * linear_gain) / edge_node.noisePower
 
             # Calculate Device Capacity (cj(x))
-            device_capacity = self.calculate_device_capacity(fog_node.bandwidth, snr)
+            device_capacity = self.calculate_device_capacity(edge_node.bandwidth, snr)
             
             if device_capacity <= 0:
                 return float("inf")
@@ -107,7 +107,7 @@ class OLBLatencyCalculator:
         except (ZeroDivisionError, ValueError, OverflowError):
             return float("inf")
 
-    def calculate_computing_latency(self, sensor, fog_node, assigned_sensors):
+    def calculate_computing_latency(self, sensor, edge_node, assigned_sensors):
         """
         Task 3.1.2: Computing Latency Analysis (L_p(j))
         """
@@ -115,14 +115,14 @@ class OLBLatencyCalculator:
             # Calculate Individual Computing Load (ebj(x))
             individual_computing_load = (
                 sensor.averageFlowRate * sensor.averageFlowSize
-            ) / fog_node.processingPower
+            ) / edge_node.processingPower
 
             # Calculate Total Computing Load (CLj)
             total_computing_load = individual_computing_load
             for assigned_sensor in assigned_sensors:
                 assigned_comp_load = (
                     assigned_sensor.averageFlowRate * assigned_sensor.averageFlowSize
-                ) / fog_node.processingPower
+                ) / edge_node.processingPower
                 total_computing_load += assigned_comp_load
 
             # System is overloaded - assignment is infeasible
@@ -155,7 +155,7 @@ class OLBPlacement(Placement):
         self.activation_dist = None
         
         self._latency_cache = {}
-        self._node_loads = {i: [] for i in range(len(digital_twin.fog_nodes))}
+        self._node_loads = {i: [] for i in range(len(digital_twin.edge_nodes))}
 
     def initial_allocation(self, sim, app_name):
         app = sim.apps[app_name]
@@ -167,10 +167,10 @@ class OLBPlacement(Placement):
             sensor = self.sensor_lookup.find_by_id(sensor_id)
 
             if sensor:
-                optimal_node_id = self._find_optimal_fog_node(sensor)
+                optimal_node_id = self._find_optimal_edge_node(sensor)
 
                 if optimal_node_id is not None:
-                    node_name = f"fog_{optimal_node_id}"
+                    node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
 
                     if optimal_node_id not in self.module_assignments:
@@ -178,18 +178,18 @@ class OLBPlacement(Placement):
                     self.module_assignments[optimal_node_id].append(sensor)
                     self._node_loads[optimal_node_id].append(sensor)
                 else:
-                    fallback_node = "fog_0"
+                    fallback_node = "edge_0"
                     sim.deploy_module(app_name, module_name, [], [fallback_node])
                     if 0 not in self.module_assignments:
                         self.module_assignments[0] = []
                     self.module_assignments[0].append(sensor)
                     self._node_loads[0].append(sensor)
 
-    def _find_optimal_fog_node(self, sensor):
+    def _find_optimal_edge_node(self, sensor):
         min_latency = float("inf")
         optimal_node_id = None
 
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             try:
                 current_load_count = len(self._node_loads[i])
                 cache_key = (sensor.device_id, i, current_load_count)
@@ -198,8 +198,8 @@ class OLBPlacement(Placement):
                     total_latency = self._latency_cache[cache_key]
                 else:
                     assigned_sensors = self.module_assignments.get(i, [])
-                    comm_latency = self.calculator.calculate_communication_latency(sensor, fog_node, assigned_sensors)
-                    comp_latency = self.calculator.calculate_computing_latency(sensor, fog_node, assigned_sensors)
+                    comm_latency = self.calculator.calculate_communication_latency(sensor, edge_node, assigned_sensors)
+                    comp_latency = self.calculator.calculate_computing_latency(sensor, edge_node, assigned_sensors)
 
                     if comm_latency == float("inf") or comp_latency == float("inf"):
                         total_latency = float("inf")

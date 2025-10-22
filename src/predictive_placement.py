@@ -55,21 +55,21 @@ class PredictiveLatencyPlacement(Placement):
                 optimal_node_id = self._find_predictive_optimal_node(sensor)
 
                 if optimal_node_id is not None:
-                    node_name = f"fog_{optimal_node_id}"
+                    node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
 
                     if optimal_node_id not in self.module_assignments:
                         self.module_assignments[optimal_node_id] = []
                     self.module_assignments[optimal_node_id].append(sensor)
                     
-                    print(f"  Sensor {sensor_id} -> Fog {optimal_node_id} (predictive)")
+                    print(f"  Sensor {sensor_id} -> edge {optimal_node_id} (predictive)")
                 else:
-                    fallback_node = "fog_0"
+                    fallback_node = "edge_0"
                     sim.deploy_module(app_name, module_name, [], [fallback_node])
                     if 0 not in self.module_assignments:
                         self.module_assignments[0] = []
                     self.module_assignments[0].append(sensor)
-                    print(f"  Sensor {sensor_id} -> Fog 0 (fallback)")
+                    print(f"  Sensor {sensor_id} -> edge 0 (fallback)")
 
     def _record_current_loads(self):
         for sensor in self.digital_twin.sensors:
@@ -79,10 +79,10 @@ class PredictiveLatencyPlacement(Placement):
                 sensor.flowTrafficSize
             )
 
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             assigned_sensors = self.module_assignments.get(i, [])
             total_load = sum(s.averageFlowRate * s.averageFlowSize for s in assigned_sensors)
-            self.workload_predictor.record_fog_node_load(i, total_load, fog_node.processingPower)
+            self.workload_predictor.record_edge_node_load(i, total_load, edge_node.processingPower)
 
     def _find_predictive_optimal_node(self, sensor):
         min_predicted_latency = float("inf")
@@ -92,16 +92,16 @@ class PredictiveLatencyPlacement(Placement):
             'candidates': []
         }
 
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             try:
                 assigned_sensors = self.module_assignments.get(i, [])
                 
                 predicted_latency = self.workload_predictor.predict_future_latency(
-                    sensor, fog_node, assigned_sensors, self.calculator
+                    sensor, edge_node, assigned_sensors, self.calculator
                 )
 
                 decision_info['candidates'].append({
-                    'fog_node_id': i,
+                    'edge_node_id': i,
                     'predicted_latency': predicted_latency
                 })
 
@@ -149,16 +149,16 @@ class ForecastBasedPlacement(Placement):
                 optimal_node_id = self._find_forecast_optimal_node(sensor, avg_future_load)
 
                 if optimal_node_id is not None:
-                    node_name = f"fog_{optimal_node_id}"
+                    node_name = f"edge_{optimal_node_id}"
                     sim.deploy_module(app_name, module_name, [], [node_name])
 
                     if optimal_node_id not in self.module_assignments:
                         self.module_assignments[optimal_node_id] = []
                     self.module_assignments[optimal_node_id].append(sensor)
                     
-                    print(f"  Sensor {sensor_id} -> Fog {optimal_node_id}")
+                    print(f"  Sensor {sensor_id} -> edge {optimal_node_id}")
                 else:
-                    fallback_node = "fog_0"
+                    fallback_node = "edge_0"
                     sim.deploy_module(app_name, module_name, [], [fallback_node])
                     if 0 not in self.module_assignments:
                         self.module_assignments[0] = []
@@ -171,12 +171,12 @@ class ForecastBasedPlacement(Placement):
         original_flow_rate = sensor.averageFlowRate
         sensor.averageFlowRate *= future_load_multiplier
 
-        for i, fog_node in enumerate(self.digital_twin.fog_nodes):
+        for i, edge_node in enumerate(self.digital_twin.edge_nodes):
             try:
                 assigned_sensors = self.module_assignments.get(i, [])
 
-                comm_latency = self.calculator.calculate_communication_latency(sensor, fog_node, assigned_sensors)
-                comp_latency = self.calculator.calculate_computing_latency(sensor, fog_node, assigned_sensors)
+                comm_latency = self.calculator.calculate_communication_latency(sensor, edge_node, assigned_sensors)
+                comp_latency = self.calculator.calculate_computing_latency(sensor, edge_node, assigned_sensors)
 
                 if comm_latency == float("inf") or comp_latency == float("inf"):
                     continue

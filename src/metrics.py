@@ -12,45 +12,45 @@ class MetricsDefinitions:
             "latency_metrics": {
                 "overall_latency": "Sum of communication and computing latencies across all sensors (ms)",
                 "communication_latency": "Network transmission delays based on distance and SNR (ms)",
-                "computing_latency": "Processing delays based on fog node CPU utilization (ms)",
+                "computing_latency": "Processing delays based on edge node CPU utilization (ms)",
                 "average_latency": "Mean latency per sensor assignment (ms)",
             },
             "energy_metrics": {
                 "total_energy": "Sum of transmission and processing energy consumption (W)",
                 "transmission_energy": "Energy used for wireless communication (W)",
-                "processing_energy": "Energy used for computation at fog nodes (W)",
+                "processing_energy": "Energy used for computation at edge nodes (W)",
             },
             "cost_metrics": {
                 "execution_cost": "Weighted combination of latency, energy, and network usage",
                 "network_usage": "Total data transmission volume (MB/s)",
-                "resource_utilization": "Average fog node CPU/memory utilization (%)",
+                "resource_utilization": "Average edge node CPU/memory utilization (%)",
             },
             "load_balance_metrics": {
-                "load_variance": "Variance in fog node utilization levels",
-                "max_utilization": "Highest fog node utilization percentage",
-                "assignment_distribution": "Number of sensors per fog node",
+                "load_variance": "Variance in edge node utilization levels",
+                "max_utilization": "Highest edge node utilization percentage",
+                "assignment_distribution": "Number of sensors per edge node",
             },
         }
 
     @staticmethod
-    def calculate_energy_consumption(sensor, fog_node, distance):
-        """Calculate energy consumption for sensor-fog assignment"""
+    def calculate_energy_consumption(sensor, edge_node, distance):
+        """Calculate energy consumption for sensor-edge assignment"""
         # Transmission energy: P_tx * t_tx
         transmission_time = sensor.flowTrafficSize / (
-            fog_node.bandwidth * 1e-3
+            edge_node.bandwidth * 1e-3
         )  # Convert MB to seconds
         transmission_energy = sensor.transmissionPower * transmission_time
 
         # Processing energy: P_cpu * t_proc
         processing_time = (
-            sensor.averageFlowSize / fog_node.processingPower * 1e-3
+            sensor.averageFlowSize / edge_node.processingPower * 1e-3
         )  # Convert MI to seconds
         processing_energy = (
-            fog_node.processingPower * 1e-6 * processing_time
+            edge_node.processingPower * 1e-6 * processing_time
         )  # Assume 1W per 1000 MIPS
 
         print(
-            f"[DEBUG] EnergyCalc -> Sensor {sensor.device_id} | Fog {fog_node.node_id} | "
+            f"[DEBUG] EnergyCalc -> Sensor {sensor.device_id} | edge {edge_node.node_id} | "
             f"TxEnergy={transmission_energy:.4f}, ProcEnergy={processing_energy:.4f}"
         )
 
@@ -117,20 +117,20 @@ class PerformanceMetrics:
         node_utilizations = []
 
         for node_id, assigned_sensors in placement.module_assignments.items():
-            if node_id >= len(digital_twin.fog_nodes):
+            if node_id >= len(digital_twin.edge_nodes):
                 continue
 
-            fog_node = digital_twin.fog_nodes[node_id]
+            edge_node = digital_twin.edge_nodes[node_id]
             node_load = len(assigned_sensors)
             node_utilizations.append(node_load)
 
             for sensor in assigned_sensors:
                 other_sensors = [s for s in assigned_sensors if s != sensor]
                 comm_lat = calculator.calculate_communication_latency(
-                    sensor, fog_node, other_sensors
+                    sensor, edge_node, other_sensors
                 )
                 comp_lat = calculator.calculate_computing_latency(
-                    sensor, fog_node, other_sensors
+                    sensor, edge_node, other_sensors
                 )
 
                 if comm_lat == float("inf") or comp_lat == float("inf"):
@@ -138,14 +138,14 @@ class PerformanceMetrics:
                     comp_lat = 1000
 
                 distance = calculator.calculate_distance(
-                    sensor.coordinates, fog_node.coordinates
+                    sensor.coordinates, edge_node.coordinates
                 )
                 energy = MetricsDefinitions.calculate_energy_consumption(
-                    sensor, fog_node, distance
+                    sensor, edge_node, distance
                 )
 
                 print(
-                    f"[TRACE] Sensor {sensor.device_id} -> Fog {fog_node.node_id}, "
+                    f"[TRACE] Sensor {sensor.device_id} -> edge {edge_node.node_id}, "
                     f"CommLat={comm_lat:.4f}, CompLat={comp_lat:.4f}, Energy={energy:.4f}"
                 )
 
@@ -156,14 +156,14 @@ class PerformanceMetrics:
                 self.detailed_assignments.append(
                     {
                         "sensor_id": sensor.device_id,
-                        "fog_node_id": fog_node.node_id,
+                        "edge_node_id": edge_node.node_id,
                         "comm_latency": comm_lat,
                         "comp_latency": comp_lat,
                         "total_latency": comm_lat + comp_lat,
                         "energy": energy,
                         "distance": distance,
                         "sensor_coordinates": sensor.coordinates,
-                        "fog_node_coordinates": fog_node.coordinates,
+                        "edge_node_coordinates": edge_node.coordinates,
                     }
                 )
 
@@ -204,8 +204,8 @@ class PerformanceMetrics:
             self.latency_p99 = sorted_latencies[p99_index] if p99_index < len(sorted_latencies) else sorted_latencies[-1]
         
         # Calculate CPU and memory utilization
-        if digital_twin.fog_nodes:
-            total_capacity = sum(fog.processingPower for fog in digital_twin.fog_nodes)
+        if digital_twin.edge_nodes:
+            total_capacity = sum(edge.processingPower for edge in digital_twin.edge_nodes)
             total_load = sum(
                 len(sensors) * sum(s.averageFlowSize for s in sensors) 
                 for sensors in placement.module_assignments.values()
@@ -214,6 +214,8 @@ class PerformanceMetrics:
             # Memory utilization estimate (based on number of assignments)
             total_assignments = sum(len(sensors) for sensors in placement.module_assignments.values())
             self.memory_utilization = min(100.0, (total_assignments / len(digital_twin.sensors) * 80)) if digital_twin.sensors else 0
+        
+
 
     def generate_report(self):
         """Generate comprehensive performance report"""
@@ -232,16 +234,16 @@ Cost of Execution (Ce): {self.cost_of_execution:.4f}
 DETAILED ASSIGNMENT ANALYSIS:
 """
 
-        # Group assignments by fog node
+        # Group assignments by edge node
         node_assignments = {}
         for assignment in self.detailed_assignments:
-            node_id = assignment["fog_node_id"]
+            node_id = assignment["edge_node_id"]
             if node_id not in node_assignments:
                 node_assignments[node_id] = []
             node_assignments[node_id].append(assignment)
 
         for node_id, assignments in node_assignments.items():
-            report += f"\nFog Node {node_id}: {len(assignments)} sensors assigned\n"
+            report += f"\nedge Node {node_id}: {len(assignments)} sensors assigned\n"
             for assignment in assignments:
                 report += f"  Sensor {assignment['sensor_id']}: Total Latency = {assignment['total_latency']:.4f}\n"
                 report += (
@@ -250,7 +252,7 @@ DETAILED ASSIGNMENT ANALYSIS:
                 report += f"    - Computing Latency: {assignment['comp_latency']:.4f}\n"
                 report += f"    - Sensor Position: {assignment['sensor_coordinates']}\n"
                 report += (
-                    f"    - Fog Node Position: {assignment['fog_node_coordinates']}\n"
+                    f"    - edge Node Position: {assignment['edge_node_coordinates']}\n"
                 )
 
         report += "\n=\n"

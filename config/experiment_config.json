@@ -8,14 +8,14 @@
   },
   "devices": {
     "num_sensors": 10,
-    "num_fog_nodes": 6,
+    "num_edge_nodes": 6,
     "sensor_params": {
       "transmission_power_range": [0.1, 1.0],
       "flow_rate_range": [0.5, 2.0],
       "traffic_size_range": [0.1, 1.0],
       "flow_size_range": [100, 1000]
     },
-    "fog_node_params": {
+    "edge_node_params": {
       "processing_power_range": [1000, 5000],
       "bandwidth_range": [10, 100],
       "carrier_frequency_range": [2.4, 5.0],

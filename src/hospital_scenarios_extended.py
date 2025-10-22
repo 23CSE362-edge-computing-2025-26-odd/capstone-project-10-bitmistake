@@ -27,7 +27,7 @@ class HospitalScenario:
         self.name = name
         self.description = description
         self.sensors: List[SensorConfig] = []
-        self.fog_nodes = 4
+        self.edge_nodes = 4
         self.data_rates: Dict[str, int] = {}
         self.criticalities: Dict[str, int] = {}
         self.sensor_types: Dict[str, int] = {}
@@ -38,7 +38,7 @@ class HospitalScenario:
             "name": self.name,
             "description": self.description,
             "total_sensors": len(self.sensors),
-            "fog_nodes": self.fog_nodes,
+            "edge_nodes": self.edge_nodes,
             "data_rates": self.data_rates,
             "criticalities": self.criticalities,
             "sensor_types": self.sensor_types,
@@ -55,7 +55,7 @@ class ICUMonitoringScenario(HospitalScenario):
             name="ICU Monitoring",
             description="Intensive Care Unit with critical patient monitoring"
         )
-        self.fog_nodes = 5
+        self.edge_nodes = 5
         self._create_sensors()
     
     def _create_sensors(self):
@@ -123,7 +123,7 @@ class PatientWardsScenario(HospitalScenario):
             name="Patient Wards",
             description="Hospital ward with diverse patient monitoring"
         )
-        self.fog_nodes = 4
+        self.edge_nodes = 4
         self._create_sensors()
     
     def _create_sensors(self):
@@ -176,7 +176,7 @@ class RemotePatientMonitoringScenario(HospitalScenario):
             name="Remote Patient Monitoring",
             description="Home-based patient monitoring across geographic area"
         )
-        self.fog_nodes = 4
+        self.edge_nodes = 4
         self._create_sensors()
     
     def _create_sensors(self):
@@ -260,7 +260,7 @@ class ScenarioManager:
             print("-" * 60)
             print(f"  Description: {info['description']}")
             print(f"  Total Sensors: {info['total_sensors']}")
-            print(f"  Fog Nodes: {info['fog_nodes']}")
+            print(f"  edge Nodes: {info['edge_nodes']}")
             print(f"  Data Rates: {info['data_rates']}")
             print(f"  Criticalities: {info['criticalities']}")
             print(f"  Sensor Types: {info['sensor_types']}")

@@ -59,22 +59,22 @@ def create_smart_healthcare_application(digital_twin):
 def create_yafs_topology(digital_twin):
     G = nx.Graph()
 
-    fog_node_names = [f"fog_{i}" for i in range(len(digital_twin.fog_nodes))]
-    all_nodes = fog_node_names + ["proxy", "cloud"]
+    edge_node_names = [f"edge_{i}" for i in range(len(digital_twin.edge_nodes))]
+    all_nodes = edge_node_names + ["proxy", "cloud"]
 
     G.add_nodes_from(all_nodes)
 
-    for i in range(len(digital_twin.fog_nodes)):
-        G.add_edge(f"fog_{i}", "proxy")
+    for i in range(len(digital_twin.edge_nodes)):
+        G.add_edge(f"edge_{i}", "proxy")
 
     G.add_edge("proxy", "cloud")
 
     topology = Topology()
     topology.create_topology_from_graph(G)
 
-    for i, fog_node in enumerate(digital_twin.fog_nodes):
-        node_name = f"fog_{i}"
-        topology.G.nodes[node_name]["IPT"] = int(fog_node.processingPower)
+    for i, edge_node in enumerate(digital_twin.edge_nodes):
+        node_name = f"edge_{i}"
+        topology.G.nodes[node_name]["IPT"] = int(edge_node.processingPower)
         topology.G.nodes[node_name]["RAM"] = 1000
         topology.G.nodes[node_name]["STORAGE"] = 10000
 
@@ -88,9 +88,9 @@ def create_yafs_topology(digital_twin):
         topology.G.nodes["cloud"]["RAM"] = 10000
         topology.G.nodes["cloud"]["STORAGE"] = 100000
 
-    for i in range(len(digital_twin.fog_nodes)):
-        topology.G.edges[f"fog_{i}", "proxy"]["BW"] = 100
-        topology.G.edges[f"fog_{i}", "proxy"]["PR"] = 4
+    for i in range(len(digital_twin.edge_nodes)):
+        topology.G.edges[f"edge_{i}", "proxy"]["BW"] = 100
+        topology.G.edges[f"edge_{i}", "proxy"]["PR"] = 4
 
     topology.G.edges["proxy", "cloud"]["BW"] = 1000
     topology.G.edges["proxy", "cloud"]["PR"] = 100

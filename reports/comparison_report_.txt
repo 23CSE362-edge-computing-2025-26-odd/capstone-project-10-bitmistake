@@ -1,0 +1,38 @@
+ ALGORITHM COMPARISON REPORT 
+
+OLB Algorithm Results:
+  Overall Latency: 8.0786
+  Energy Consumption: 59.7908 W
+  Network Usage: 5.0760 MB/s
+  Cost of Execution: 2.2575
+
+Random Algorithm Results:
+  Overall Latency: 14.2052
+  Energy Consumption: 65.2519 W
+  Network Usage: 5.0760 MB/s
+  Cost of Execution: 2.9794
+
+Distance Algorithm Results:
+  Overall Latency: 14002.0056
+  Energy Consumption: 54.0796 W
+  Network Usage: 5.0760 MB/s
+  Cost of Execution: 1401.5360
+
+LoadBalanced Algorithm Results:
+  Overall Latency: 6004.3831
+  Energy Consumption: 59.3162 W
+  Network Usage: 5.0760 MB/s
+  Cost of Execution: 601.8784
+
+FNPA Algorithm Results:
+  Overall Latency: 14002.0056
+  Energy Consumption: 54.0796 W
+  Network Usage: 5.0760 MB/s
+  Cost of Execution: 1401.5360
+
+PERFORMANCE RANKING:
+1. OLB (Lowest Latency)
+2. Random (Lowest Latency)
+3. LoadBalanced (Lowest Latency)
+4. Distance (Lowest Latency)
+5. FNPA (Lowest Latency)
