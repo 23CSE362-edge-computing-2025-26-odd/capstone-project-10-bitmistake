@@ -53,9 +53,16 @@ def get_or_create_workload_predictor(model_dir: str = "CI_Models/Workload/models
     return _cached_workload_predictor
 
 
+def clear_workload_predictor_cache():
+    """Clear the cached workload predictor to free memory."""
+    global _cached_workload_predictor
+    _cached_workload_predictor = None
+    print("[INFO] Workload predictor cache cleared")
+
+
 def setup_directories():
     """Create output directories"""
-    dirs = ["results", "data", "reports", "logs", "plots"]
+    dirs = ["results", "data", "reports", "plots"]
     for dir_name in dirs:
         os.makedirs(dir_name, exist_ok=True)
 
@@ -203,6 +210,10 @@ def run_olb_simulation():
         print("✓ OLB SIMULATION COMPLETED SUCCESSFULLY!")
         print(f"✓ Results saved to: {results_filename}")
         print("=" * 80)
+        
+        # Clear cache to free memory
+        if WORKLOAD_PREDICTOR_AVAILABLE:
+            clear_workload_predictor_cache()
 
         return 0
 
